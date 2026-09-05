@@ -6,4 +6,5 @@ dist/
 .firebase/
 .terraform/
 coverage/
+*.tsbuildinfo
 .DS_Store
