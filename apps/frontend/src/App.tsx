@@ -12,19 +12,24 @@ type Incident = {
   updatedAt: string;
 };
 
-type ZoneId = "zone-a" | "zone-b" | "zone-c";
+type ZoneId = "zone-a";
 type Vec3 = [number, number, number];
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
-const zoneCenters: Record<ZoneId, Vec3> = {
-  "zone-a": [-8, 0, 0],
-  "zone-b": [0, 0, 0],
-  "zone-c": [8, 0, 0]
-};
+const zoneCenters: Record<ZoneId, Vec3> = { "zone-a": [0, 0, 0] };
 const signalSlots: Record<ZoneId, Vec3[]> = {
-  "zone-a": [[1.9, 0.7, -1.55], [-1.3, 1.5, -0.7], [0.9, 2.35, 0.4], [-0.2, 1.6, 0.7]],
-  "zone-b": [[-1.4, 0.7, -0.4], [0.8, 0.7, 0.6], [1.4, 0.5, -0.8], [-0.5, 1.1, 0.9]],
-  "zone-c": [[-1.5, 0.5, -0.6], [0.4, 0.6, 0.8], [1.4, 0.4, -0.7], [0.2, 1.1, -0.1]]
+  "zone-a": [
+    [5.0, 0.75, 3.1],    // helipad
+    [-5.0, 0.85, -2.8],   // security post
+    [-4.0, 0.55, 2.3],    // visitor parking
+    [4.0, 0.85, -2.0],    // pharmacy / cafe
+    [-1.8, 1.0, 0.2],     // floor 1
+    [-1.0, 1.8, 0.2],     // floor 2
+    [0.1, 2.6, 0.2],      // floor 3
+    [1.2, 3.35, 0.2],     // floor 4
+    [0.0, 0.5, 4.0],      // service yard
+    [-3.4, 0.45, -0.9]    // emergency bay
+  ]
 };
 
 function colorFor(status?: string) {
@@ -45,64 +50,52 @@ function Label({ title, subtitle }: { title: string; subtitle: string }) {
 function HospitalZone() {
   const floors = [0, 1, 2, 3];
   return <group position={zoneCenters["zone-a"]}>
-    <Label title="ZONE A · HOSPITAL" subtitle="Four-floor emergency care campus" />
-    <mesh position={[0, -0.35, 0]}><boxGeometry args={[6.4, 0.12, 5.2]} /><meshStandardMaterial color="#172554" /></mesh>
-    <mesh position={[-0.25, 1.05, 0]}><boxGeometry args={[4.35, 3.35, 2.95]} /><meshPhysicalMaterial color="#93c5fd" transmission={0.78} roughness={0.12} transparent opacity={0.24} side={2} /></mesh>
+    <Label title="ZONE A · CLEVELAND CLINIC-INSPIRED CAMPUS" subtitle="Fictionalized facilities operations schematic" />
+    <mesh position={[0, -0.35, 0]}><boxGeometry args={[15, 0.12, 10]} /><meshStandardMaterial color="#172554" /></mesh>
+
+    {/* Central four-floor transparent hospital */}
+    <mesh position={[-0.8, 1.35, 0]}><boxGeometry args={[6.8, 4.55, 4.5]} /><meshPhysicalMaterial color="#93c5fd" transmission={0.82} roughness={0.1} transparent opacity={0.2} side={2} /></mesh>
     {floors.map((floor) => {
-      const y = floor * 0.78 + 0.05;
-      return <group key={floor} position={[-0.25, y, 0]}>
-        <mesh><boxGeometry args={[4.2, 0.1, 2.85]} /><meshStandardMaterial color={floor === 0 ? "#e0f2fe" : "#bfdbfe"} transparent opacity={0.78} /></mesh>
-        <Text position={[-2.5, 0.25, 1.55]} fontSize={0.16} color="#e0f2fe" anchorX="center">F{floor + 1}</Text>
-        <mesh position={[-1.25, 0.34, 0.2]}><boxGeometry args={[1.15, 0.34, 0.8]} /><meshStandardMaterial color={floor % 2 === 0 ? "#38bdf8" : "#818cf8"} transparent opacity={0.75} /></mesh>
-        <mesh position={[0.15, 0.34, 0.2]}><boxGeometry args={[1.15, 0.34, 0.8]} /><meshStandardMaterial color="#60a5fa" transparent opacity={0.75} /></mesh>
-        <mesh position={[1.35, 0.34, 0.2]}><boxGeometry args={[0.7, 0.34, 0.8]} /><meshStandardMaterial color="#c4b5fd" transparent opacity={0.75} /></mesh>
-        <mesh position={[0.15, 0.34, -0.82]}><boxGeometry args={[1.8, 0.34, 0.55]} /><meshStandardMaterial color="#dbeafe" transparent opacity={0.7} /></mesh>
+      const y = floor * 0.95 + 0.05;
+      return <group key={floor} position={[-0.8, y, 0]}>
+        <mesh><boxGeometry args={[6.55, 0.12, 4.25]} /><meshStandardMaterial color={floor === 0 ? "#e0f2fe" : "#bfdbfe"} transparent opacity={0.8} /></mesh>
+        <Text position={[-3.35, 0.28, 2.3]} fontSize={0.18} color="#e0f2fe" anchorX="center">F{floor + 1}</Text>
+        <mesh position={[-2.0, 0.4, 0.5]}><boxGeometry args={[1.55, 0.5, 1.1]} /><meshStandardMaterial color={floor % 2 === 0 ? "#38bdf8" : "#818cf8"} transparent opacity={0.72} /></mesh>
+        <mesh position={[0, 0.4, 0.5]}><boxGeometry args={[1.55, 0.5, 1.1]} /><meshStandardMaterial color="#60a5fa" transparent opacity={0.72} /></mesh>
+        <mesh position={[1.9, 0.4, 0.5]}><boxGeometry args={[1.2, 0.5, 1.1]} /><meshStandardMaterial color="#c4b5fd" transparent opacity={0.72} /></mesh>
+        <mesh position={[0, 0.4, -1.15]}><boxGeometry args={[3.6, 0.5, 0.75]} /><meshStandardMaterial color="#dbeafe" transparent opacity={0.7} /></mesh>
       </group>;
     })}
-    <mesh position={[2.2, 1.05, 0.2]}><boxGeometry args={[1.4, 2.2, 2.2]} /><meshPhysicalMaterial color="#bfdbfe" transmission={0.68} roughness={0.1} transparent opacity={0.3} /></mesh>
-    <mesh position={[2.2, 1.05, -0.9]}><boxGeometry args={[0.42, 2.45, 0.42]} /><meshStandardMaterial color="#334155" /></mesh>
-    <mesh position={[-2.3, -0.08, -1.45]}><boxGeometry args={[1.8, 0.12, 1.1]} /><meshStandardMaterial color="#ef4444" /></mesh>
-    <Text position={[-2.3, 0.05, -1.45]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.18} color="white" anchorX="center">ER</Text>
-    <mesh position={[1.9, -0.03, -1.55]} rotation={[-Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.75, 0.75, 0.08, 32]} /><meshStandardMaterial color="#0f172a" /></mesh>
-    <Text position={[1.9, 0.04, -1.55]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.16} color="#fbbf24" anchorX="center">H</Text>
-    {[-2.4, -1.7, 2.7].map((x) => <group key={x} position={[x, 0.15, 1.7]}><mesh><cylinderGeometry args={[0.18, 0.24, 0.8, 10]} /><meshStandardMaterial color="#475569" /></mesh><mesh position={[0, 0.55, 0]}><coneGeometry args={[0.45, 0.8, 10]} /><meshStandardMaterial color="#166534" /></mesh></group>)}
-  </group>;
-}
+    <mesh position={[2.5, 1.15, 0]}><boxGeometry args={[1.25, 2.3, 3.2]} /><meshPhysicalMaterial color="#bfdbfe" transmission={0.75} roughness={0.1} transparent opacity={0.28} /></mesh>
+    <mesh position={[2.5, 1.15, -0.8]}><boxGeometry args={[0.45, 2.5, 0.45]} /><meshStandardMaterial color="#334155" /></mesh>
 
-function CampusBuilding({ position, size, color }: { position: Vec3; size: Vec3; color: string }) {
-  return <group position={position}><mesh position={[0, size[1] / 2 - 0.3, 0]}><boxGeometry args={size} /><meshStandardMaterial color={color} /></mesh><mesh position={[0, size[1] + 0.02 - 0.3, 0]}><boxGeometry args={[size[0] * 0.72, 0.12, size[2] * 0.72]} /><meshStandardMaterial color="#334155" /></mesh></group>;
-}
+    {/* Clinical wing and emergency bay */}
+    <mesh position={[4.1, 0.9, 0.3]}><boxGeometry args={[2.4, 2.1, 3.8]} /><meshPhysicalMaterial color="#bae6fd" transmission={0.65} transparent opacity={0.32} /></mesh>
+    <mesh position={[-4.3, 0.05, -1.8]}><boxGeometry args={[2.8, 0.12, 1.5]} /><meshStandardMaterial color="#ef4444" /></mesh>
+    <Text position={[-4.3, 0.16, -1.8]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.22} color="white" anchorX="center">EMERGENCY BAY</Text>
 
-function Tree({ position }: { position: Vec3 }) {
-  return <group position={position}><mesh position={[0, 0.25, 0]}><cylinderGeometry args={[0.09, 0.12, 0.5, 8]} /><meshStandardMaterial color="#78350f" /></mesh><mesh position={[0, 0.72, 0]}><coneGeometry args={[0.42, 0.95, 8]} /><meshStandardMaterial color="#15803d" /></mesh></group>;
-}
+    {/* Security gate and visitor parking */}
+    <mesh position={[-5.2, 0.3, -3.4]}><boxGeometry args={[1.25, 0.7, 1.1]} /><meshStandardMaterial color="#f59e0b" /></mesh>
+    <mesh position={[-5.2, 0.75, -3.4]}><boxGeometry args={[1.05, 0.08, 0.9]} /><meshPhysicalMaterial color="#bae6fd" transmission={0.5} transparent opacity={0.35} /></mesh>
+    <Text position={[-5.2, 0.82, -3.4]} fontSize={0.14} color="#111827" anchorX="center">SECURITY</Text>
+    <mesh position={[-4.7, -0.05, 2.65]}><boxGeometry args={[4.2, 0.08, 3.3]} /><meshStandardMaterial color="#334155" /></mesh>
+    {[-5.8, -4.8, -3.8].map((x) => <mesh key={x} position={[x, 0.02, 2.65]}><boxGeometry args={[0.55, 0.06, 2.8]} /><meshStandardMaterial color="#f8fafc" /></mesh>)}
+    <Text position={[-4.7, 0.1, 4.35]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.2} color="#e2e8f0" anchorX="center">VISITOR PARKING</Text>
 
-function CampusZone() {
-  const trees: Vec3[] = [[-2.5, 0, -1.8], [-1.8, 0, 1.8], [1.8, 0, 1.7], [2.5, 0, -1.5]];
-  return <group position={zoneCenters["zone-b"]}>
-    <Label title="ZONE B · UNIVERSITY" subtitle="Campus and public spaces" />
-    <mesh position={[0, -0.35, 0]}><boxGeometry args={[6.4, 0.12, 5.2]} /><meshStandardMaterial color="#14532d" /></mesh>
-    <mesh position={[0, -0.25, 0]}><boxGeometry args={[1.0, 0.05, 5.1]} /><meshStandardMaterial color="#475569" /></mesh>
-    <mesh position={[0, -0.24, 0]} rotation={[0, Math.PI / 2, 0]}><boxGeometry args={[1.0, 0.05, 6.2]} /><meshStandardMaterial color="#475569" /></mesh>
-    <CampusBuilding position={[0, 0, 0]} size={[2.1, 1.8, 1.6]} color="#f59e0b" />
-    <CampusBuilding position={[-2.0, 0, 0.9]} size={[1.4, 1.1, 1.2]} color="#fbbf24" />
-    <CampusBuilding position={[2.0, 0, -0.9]} size={[1.6, 1.25, 1.1]} color="#fde68a" />
-    {trees.map((position, index) => <Tree key={index} position={position} />)}
-  </group>;
-}
+    {/* Retail pharmacy / cafe and service yard */}
+    <mesh position={[4.25, 0.35, -3.0]}><boxGeometry args={[2.7, 0.8, 1.5]} /><meshStandardMaterial color="#fb923c" /></mesh>
+    <Text position={[4.25, 0.82, -3.0]} fontSize={0.2} color="white" anchorX="center">PHARMACY · CAFÉ</Text>
+    <mesh position={[0.7, 0.15, 4.0]}><boxGeometry args={[4.5, 0.35, 1.1]} /><meshStandardMaterial color="#64748b" /></mesh>
+    <mesh position={[0.7, 0.42, 4.0]}><boxGeometry args={[1.0, 0.25, 0.7]} /><meshStandardMaterial color="#f97316" /></mesh>
+    <Text position={[0.7, 0.65, 4.0]} fontSize={0.16} color="#f8fafc" anchorX="center">SERVICE YARD</Text>
 
-function BeachZone() {
-  return <group position={zoneCenters["zone-c"]}>
-    <Label title="ZONE C · BEACH" subtitle="Shoreline and adjacent infrastructure" />
-    <mesh position={[0, -0.35, 0]}><boxGeometry args={[6.4, 0.12, 5.2]} /><meshStandardMaterial color="#facc15" /></mesh>
-    <mesh position={[1.9, -0.22, 0]}><boxGeometry args={[2.4, 0.08, 5.1]} /><meshStandardMaterial color="#0ea5e9" transparent opacity={0.82} /></mesh>
-    <mesh position={[-0.15, -0.2, -1.8]}><boxGeometry args={[0.25, 0.12, 4.3]} /><meshStandardMaterial color="#64748b" /></mesh>
-    <mesh position={[0.45, -0.05, 0.75]}><boxGeometry args={[0.55, 0.9, 0.55]} /><meshStandardMaterial color="#dc2626" /></mesh>
-    <mesh position={[0.45, 0.5, 0.75]}><boxGeometry args={[1.2, 0.1, 0.1]} /><meshStandardMaterial color="#f8fafc" /></mesh>
-    <mesh position={[0.45, 0.95, 0.75]}><boxGeometry args={[0.1, 0.9, 0.1]} /><meshStandardMaterial color="#f8fafc" /></mesh>
-    <mesh position={[0.45, -0.12, 2.0]}><boxGeometry args={[0.45, 0.2, 2.1]} /><meshStandardMaterial color="#92400e" /></mesh>
-    <CampusBuilding position={[-1.9, 0, -1.3]} size={[1.2, 0.8, 0.8]} color="#fb923c" />
-    <mesh position={[-1.9, 0.15, 0.95]}><cylinderGeometry args={[0.6, 0.6, 0.25, 24]} /><meshStandardMaterial color="#f8fafc" /></mesh>
+    {/* Helipad */}
+    <mesh position={[5.0, -0.03, 3.1]} rotation={[-Math.PI / 2, 0, 0]}><cylinderGeometry args={[1.0, 1.0, 0.1, 32]} /><meshStandardMaterial color="#0f172a" /></mesh>
+    <Text position={[5.0, 0.06, 3.1]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.45} color="#fbbf24" anchorX="center">H</Text>
+    <mesh position={[5.0, 0.1, 3.1]}><boxGeometry args={[0.08, 0.08, 1.5]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+    <mesh position={[5.0, 0.1, 3.1]} rotation={[0, Math.PI / 2, 0]}><boxGeometry args={[0.08, 0.08, 1.5]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+
+    {[-6.0, -2.8, 3.1].map((x) => <group key={x} position={[x, 0.15, -0.1]}><mesh><cylinderGeometry args={[0.18, 0.24, 0.8, 10]} /><meshStandardMaterial color="#475569" /></mesh><mesh position={[0, 0.55, 0]}><coneGeometry args={[0.45, 0.8, 10]} /><meshStandardMaterial color="#166534" /></mesh></group>)}
   </group>;
 }
 
@@ -115,9 +108,9 @@ function SignalMarker({ incident, position }: { incident: Incident; position: Ve
 }
 
 function SpatialMap({ incidents }: { incidents: Incident[] }) {
-  const offsets: Record<ZoneId, number> = { "zone-a": 0, "zone-b": 0, "zone-c": 0 };
+  const offsets: Record<ZoneId, number> = { "zone-a": 0 };
   const markers = incidents.map((incident) => {
-    const zone = (incident.zoneId in zoneCenters ? incident.zoneId : "zone-b") as ZoneId;
+    const zone: ZoneId = "zone-a";
     const slot = signalSlots[zone][offsets[zone]++ % signalSlots[zone].length];
     const center = zoneCenters[zone];
     return { incident, position: [center[0] + slot[0], center[1] + slot[1], center[2] + slot[2]] as Vec3 };
@@ -131,8 +124,6 @@ function SpatialMap({ incidents }: { incidents: Incident[] }) {
     <pointLight position={[8, 4, 2]} color="#facc15" intensity={12} distance={12} />
     <group rotation={[-0.22, 0, 0]}>
       <HospitalZone />
-      <CampusZone />
-      <BeachZone />
       {markers.map(({ incident, position }) => <SignalMarker key={incident.id} incident={incident} position={position} />)}
     </group>
     <OrbitControls enablePan={false} minDistance={13} maxDistance={30} />
@@ -162,7 +153,7 @@ export default function App() {
   useEffect(() => { load(); const timer = window.setInterval(load, 2000); return () => window.clearInterval(timer); }, []);
 
   return <main>
-    <header><div><p className="eyebrow">SITESIGNAL / LIVE OPERATIONS</p><h1>Voice-powered incident reporting</h1><p className="subtitle">Hospital, campus and shoreline signals on one spatial operations map.</p></div><span className="pill">{incidents.length} active signals</span></header>
+    <header><div><p className="eyebrow">SITESIGNAL / LIVE OPERATIONS</p><h1>Voice-powered incident reporting</h1><p className="subtitle">One large hospital campus: security, facilities, parking, retail, emergency and helipad operations.</p></div><span className="pill">{incidents.length} active signals</span></header>
     <section className="layout">
       <div className="map-card"><SpatialMap incidents={incidents} /></div>
       <aside className="panel"><div className="panel-heading"><h2>Incident queue</h2><button onClick={load}>Refresh</button></div>{error && <p className="error">{error}</p>}{incidents.length === 0 && !error && <p className="empty">No incidents. Call the SiteSignal number to report one.</p>}{incidents.map(incident => <article className="incident" key={incident.id}><div className="incident-top"><strong>{incident.id}</strong><span className="status" style={{ color: colorFor(incident.status) }}>{incident.status}</span></div><h3>{incident.zoneId} · {incident.category}</h3><p>{incident.description}</p><small>{incident.reportCount} report(s) · {new Date(incident.updatedAt).toLocaleTimeString()}</small>{incident.status !== "RESOLVED" && <div className="actions">{incident.status === "REPORTED" || incident.status === "CORROBORATED" ? <button onClick={() => updateIncident(incident.id, "acknowledge")}>Acknowledge</button> : null}<button onClick={() => updateIncident(incident.id, "resolve")}>Resolve</button></div>}</article>)}</aside>
