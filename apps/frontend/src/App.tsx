@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Float, OrbitControls, Text } from "@react-three/drei";
+import { Edges, Float, OrbitControls, Text } from "@react-three/drei";
 
 type Incident = {
   id: string;
@@ -18,23 +18,23 @@ const API = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
 // Detailed locations matching the Hospital Site Map template
 const locationAnchors: Record<string, Vec3> = {
-  cardiology: [0, 8.5, -1.0],      // Top of Cardiology / Critical Care Tower
-  critical_care: [0, 4.0, 1.2],    // Mid-tier Critical Care
-  emergency_a_and_e: [-8.5, 2.0, 1.5], // A&E entrance
-  emergency_entrance: [-11.0, 1.2, 3.8], // Emergency ambulance bay
-  main_entrance: [-2.0, 1.2, 5.5], // Main Hospital Entrance
-  breast_center: [-6.5, 3.0, -1.8], // Breast Center
-  clinic_block: [-12.5, 3.2, -1.0], // Multi-floor Clinic Block
-  laboratory: [-15.5, 1.8, -4.5],  // Laboratory building
-  mental_health: [-4.0, 2.0, -8.5],// Mental Health Unit
-  general_inpatient: [7.5, 2.8, -4.5], // General Inpatient Wing
-  oncology: [12.0, 2.6, 0.5],      // Oncology Building
-  dermatology: [15.0, 1.8, 3.2],   // Dermatology Clinic
-  neonatal: [4.8, 2.8, 5.0],       // Neonatal Care
-  maternity: [5.2, 1.8, 8.8],      // Maternity Unit
-  parking_west: [-12.0, 0.5, -7.0],// West Parking
-  parking_east: [11.0, 0.5, 7.8],  // East Parking
-  parking_central: [4.0, 0.5, -0.5]// Central Staff Parking
+  cardiology: [0, 8.5, -1.0],          // Cardiology / Critical Care Tower
+  critical_care: [0, 4.0, 1.2],        // Mid-tier Critical Care
+  emergency_a_and_e: [-9.5, 2.0, 1.5], // A&E entrance
+  emergency_entrance: [-11.0, 1.2, 3.8],// Emergency ambulance bay
+  main_entrance: [-2.0, 1.2, 5.5],     // Main Hospital Entrance
+  breast_center: [-5.8, 2.2, -2.5],    // Breast Center
+  clinic_block: [-12.5, 3.2, -2.0],    // Multi-floor Clinic Block
+  laboratory: [-15.5, 1.8, -6.5],      // Laboratory building
+  mental_health: [-4.5, 1.8, -9.0],    // Mental Health Unit
+  general_inpatient: [8.0, 2.4, -4.5], // General Inpatient Wing
+  oncology: [12.5, 2.4, 0.5],          // Oncology Building
+  dermatology: [16.5, 1.6, 2.3],       // Dermatology Clinic
+  neonatal: [5.8, 2.4, 5.0],           // Neonatal Care
+  maternity: [5.8, 1.6, 9.0],          // Maternity Unit
+  parking_west: [-11.5, 0.5, -8.5],    // West Parking
+  parking_central: [4.0, 0.5, -0.5],   // Central Staff Parking
+  parking_maternity: [-0.5, 0.5, 8.5]  // South Parking
 };
 
 const anchorList = Object.values(locationAnchors);
@@ -48,504 +48,435 @@ function colorFor(status?: string) {
   return "#64748b";
 }
 
-// Window matrix component for realistic hospital facades
-function WindowGrid({
-  width,
-  height,
-  rows,
-  cols,
+// Blueprint holographic building block with luminous cyan wireframe edges
+function BlueprintBuilding({
+  args,
   position,
-  rotation = [0, 0, 0]
+  label,
+  floors = 1
 }: {
-  width: number;
-  height: number;
-  rows: number;
-  cols: number;
+  args: [number, number, number];
   position: Vec3;
-  rotation?: Vec3;
+  label?: string;
+  floors?: number;
 }) {
-  const cellW = width / cols;
-  const cellH = height / rows;
-  const items: Array<{ x: number; y: number }> = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      items.push({
-        x: (c - (cols - 1) / 2) * cellW,
-        y: (r - (rows - 1) / 2) * cellH
-      });
-    }
-  }
+  const [w, h, d] = args;
+  const floorHeight = h / floors;
+  const floorSlabs = Array.from({ length: floors - 1 }, (_, i) => (i + 1) * floorHeight - h / 2);
 
   return (
-    <group position={position} rotation={rotation}>
-      {items.map((it, idx) => (
-        <mesh key={idx} position={[it.x, it.y, 0.02]}>
-          <planeGeometry args={[cellW * 0.72, cellH * 0.65]} />
-          <meshStandardMaterial color="#0284c7" roughness={0.1} metalness={0.8} />
+    <group position={position}>
+      {/* Outer semi-transparent blueprint glass volume */}
+      <mesh>
+        <boxGeometry args={args} />
+        <meshPhysicalMaterial
+          color="#0284c7"
+          transmission={0.88}
+          roughness={0.12}
+          metalness={0.1}
+          transparent
+          opacity={0.32}
+          side={2}
+        />
+        {/* Crisp luminous cyan wireframe edges */}
+        <Edges threshold={15} color="#38bdf8" />
+      </mesh>
+
+      {/* Internal structural floor wireframe slabs */}
+      {floorSlabs.map((y, idx) => (
+        <mesh key={idx} position={[0, y, 0]}>
+          <boxGeometry args={[w * 0.98, 0.06, d * 0.98]} />
+          <meshBasicMaterial color="#0369a1" transparent opacity={0.55} />
+          <Edges threshold={15} color="#0ea5e9" />
         </mesh>
       ))}
+
+      {/* Building holographic label */}
+      {label && (
+        <group position={[0, h / 2 + 0.55, 0]}>
+          <mesh>
+            <planeGeometry args={[Math.min(w * 0.9, 5.5), 0.42]} />
+            <meshBasicMaterial color="#020617" transparent opacity={0.8} />
+          </mesh>
+          <Text fontSize={0.24} color="#7dd3fc" anchorX="center" anchorY="middle">
+            {label}
+          </Text>
+        </group>
+      )}
     </group>
   );
 }
 
-// Red directional entrance arrow / flag marker matching template
-function EntranceMarker({
-  text,
+// Low-poly blueprint holographic car with wireframe
+function BlueprintCar({
   position,
   rotation = [0, 0, 0]
 }: {
-  text: string;
   position: Vec3;
   rotation?: Vec3;
 }) {
   return (
     <group position={position} rotation={rotation}>
-      {/* Red flag pole */}
-      <mesh position={[0, 0.5, 0]}>
-        <cylinderGeometry args={[0.04, 0.04, 1.0, 8]} />
-        <meshStandardMaterial color="#475569" />
+      <mesh position={[0, 0.2, 0]}>
+        <boxGeometry args={[1.2, 0.28, 0.65]} />
+        <meshBasicMaterial color="#075985" transparent opacity={0.65} />
+        <Edges threshold={15} color="#38bdf8" />
       </mesh>
-      {/* Red badge */}
-      <mesh position={[0.7, 0.85, 0]}>
-        <boxGeometry args={[1.5, 0.45, 0.08]} />
-        <meshStandardMaterial color="#dc2626" />
+      <mesh position={[-0.05, 0.38, 0]}>
+        <boxGeometry args={[0.65, 0.22, 0.58]} />
+        <meshBasicMaterial color="#0284c7" transparent opacity={0.5} />
+        <Edges threshold={15} color="#7dd3fc" />
       </mesh>
-      <Text position={[0.7, 0.85, 0.06]} fontSize={0.16} color="white" anchorX="center" anchorY="middle">
-        {text}
-      </Text>
     </group>
   );
 }
 
-// Ambulance vehicle model
-function Ambulance({ position, rotation = [0, 0, 0] }: { position: Vec3; rotation?: Vec3 }) {
+// Low-poly blueprint ambulance
+function BlueprintAmbulance({
+  position,
+  rotation = [0, 0, 0]
+}: {
+  position: Vec3;
+  rotation?: Vec3;
+}) {
   return (
     <group position={position} rotation={rotation}>
       <mesh position={[0, 0.35, 0]}>
-        <boxGeometry args={[1.6, 0.7, 0.85]} />
-        <meshStandardMaterial color="#f8fafc" />
+        <boxGeometry args={[1.6, 0.65, 0.82]} />
+        <meshBasicMaterial color="#0284c7" transparent opacity={0.75} />
+        <Edges threshold={15} color="#38bdf8" />
       </mesh>
-      <mesh position={[0.4, 0.3, 0]}>
-        <boxGeometry args={[0.5, 0.55, 0.82]} />
-        <meshStandardMaterial color="#f8fafc" />
+      {/* Emergency flashing blue beacon */}
+      <mesh position={[0, 0.72, 0]}>
+        <boxGeometry args={[0.22, 0.1, 0.35]} />
+        <meshBasicMaterial color="#60a5fa" />
       </mesh>
-      {/* Blue emergency beacon */}
-      <mesh position={[0, 0.78, 0]}>
-        <boxGeometry args={[0.2, 0.12, 0.4]} />
-        <meshStandardMaterial color="#2563eb" emissive="#3b82f6" emissiveIntensity={1.2} />
-      </mesh>
-      {/* Red cross stripe */}
-      <mesh position={[-0.2, 0.4, 0.43]}>
-        <boxGeometry args={[0.6, 0.12, 0.02]} />
-        <meshStandardMaterial color="#ef4444" />
-      </mesh>
-      {/* Wheels */}
-      {[-0.5, 0.5].map((x) => (
-        <group key={x}>
-          <mesh position={[x, 0.12, 0.42]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.14, 0.14, 0.08, 12]} />
-            <meshStandardMaterial color="#0f172a" />
-          </mesh>
-          <mesh position={[x, 0.12, -0.42]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.14, 0.14, 0.08, 12]} />
-            <meshStandardMaterial color="#0f172a" />
-          </mesh>
-        </group>
-      ))}
     </group>
   );
 }
 
-// Low-poly parked car
-function Car({ position, color, rotation = [0, 0, 0] }: { position: Vec3; color: string; rotation?: Vec3 }) {
-  return (
-    <group position={position} rotation={rotation}>
-      <mesh position={[0, 0.22, 0]}>
-        <boxGeometry args={[1.2, 0.32, 0.65]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-      <mesh position={[-0.05, 0.42, 0]}>
-        <boxGeometry args={[0.65, 0.26, 0.58]} />
-        <meshStandardMaterial color="#cbd5e1" roughness={0.2} />
-      </mesh>
-      {/* Wheels */}
-      {[-0.38, 0.38].map((x) => (
-        <group key={x}>
-          <mesh position={[x, 0.1, 0.33]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.1, 0.1, 0.06, 10]} />
-            <meshStandardMaterial color="#0f172a" />
-          </mesh>
-          <mesh position={[x, 0.1, -0.33]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.1, 0.1, 0.06, 10]} />
-            <meshStandardMaterial color="#0f172a" />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  );
-}
-
-// Tree model
-function CampusTree({ position }: { position: Vec3 }) {
+// Holographic wireframe tree
+function BlueprintTree({ position }: { position: Vec3 }) {
   return (
     <group position={position}>
-      <mesh position={[0, 0.5, 0]}>
-        <cylinderGeometry args={[0.08, 0.12, 1.0, 6]} />
-        <meshStandardMaterial color="#78350f" />
+      <mesh position={[0, 0.45, 0]}>
+        <cylinderGeometry args={[0.06, 0.09, 0.9, 6]} />
+        <meshBasicMaterial color="#0369a1" transparent opacity={0.6} />
       </mesh>
       <mesh position={[0, 1.25, 0]}>
-        <sphereGeometry args={[0.55, 10, 10]} />
-        <meshStandardMaterial color="#15803d" roughness={0.8} />
-      </mesh>
-      <mesh position={[0, 1.7, 0]}>
-        <sphereGeometry args={[0.42, 8, 8]} />
-        <meshStandardMaterial color="#16a34a" roughness={0.8} />
+        <coneGeometry args={[0.48, 1.1, 6]} />
+        <meshBasicMaterial color="#0284c7" transparent opacity={0.35} />
+        <Edges threshold={15} color="#38bdf8" />
       </mesh>
     </group>
   );
 }
 
-// Complete Hospital Campus based on the isometric template
+// Entire Hospital Campus rendered in cinematic cyan/blue architectural wireframe skeleton
 function HospitalCampus() {
   const floorLevels = [0, 1, 2, 3, 4, 5, 6, 7];
 
   return (
     <group position={[0, 0, 0]}>
-      {/* Lush green campus terrain matching template (46 x 34) */}
-      <mesh position={[0, -0.2, 0]}>
-        <boxGeometry args={[46, 0.3, 34]} />
-        <meshStandardMaterial color="#4d7c0f" roughness={0.9} />
+      {/* Base ground plate - Dark blueprint slate grid (46 x 34) */}
+      <mesh position={[0, -0.15, 0]}>
+        <boxGeometry args={[46, 0.2, 34]} />
+        <meshStandardMaterial color="#030b17" roughness={0.9} />
+        <Edges threshold={15} color="#0369a1" />
       </mesh>
 
-      {/* Road network - Light grey tarmac running through and around the campus */}
-      {/* Main horizontal perimeter road */}
+      {/* Road / circulation layout in dark slate with blueprint edges */}
       <mesh position={[0, -0.04, -13.5]}>
-        <boxGeometry args={[45, 0.04, 3.0]} />
-        <meshStandardMaterial color="#cbd5e1" roughness={0.7} />
+        <boxGeometry args={[45, 0.02, 3.0]} />
+        <meshBasicMaterial color="#07182e" transparent opacity={0.8} />
+        <Edges threshold={15} color="#0284c7" />
       </mesh>
-      {/* South entrance road */}
       <mesh position={[0, -0.04, 13.5]}>
-        <boxGeometry args={[45, 0.04, 3.0]} />
-        <meshStandardMaterial color="#cbd5e1" roughness={0.7} />
+        <boxGeometry args={[45, 0.02, 3.0]} />
+        <meshBasicMaterial color="#07182e" transparent opacity={0.8} />
+        <Edges threshold={15} color="#0284c7" />
       </mesh>
-      {/* Central campus internal driveways */}
       <mesh position={[-7.5, -0.04, 0]}>
-        <boxGeometry args={[2.5, 0.04, 25]} />
-        <meshStandardMaterial color="#e2e8f0" roughness={0.7} />
+        <boxGeometry args={[2.5, 0.02, 25]} />
+        <meshBasicMaterial color="#07182e" transparent opacity={0.8} />
+        <Edges threshold={15} color="#0284c7" />
       </mesh>
       <mesh position={[9.0, -0.04, 0]}>
-        <boxGeometry args={[2.5, 0.04, 25]} />
-        <meshStandardMaterial color="#e2e8f0" roughness={0.7} />
+        <boxGeometry args={[2.5, 0.02, 25]} />
+        <meshBasicMaterial color="#07182e" transparent opacity={0.8} />
+        <Edges threshold={15} color="#0284c7" />
       </mesh>
       <mesh position={[0, -0.04, 0]}>
-        <boxGeometry args={[30, 0.04, 2.4]} />
-        <meshStandardMaterial color="#e2e8f0" roughness={0.7} />
+        <boxGeometry args={[30, 0.02, 2.4]} />
+        <meshBasicMaterial color="#07182e" transparent opacity={0.8} />
+        <Edges threshold={15} color="#0284c7" />
       </mesh>
 
       {/* ========================================================
           1. CENTRAL MAIN TOWER (Cardiology Center / Critical Care)
-          High-rise glass tower with visible internal floor slabs
+          8-floor high-rise glass wireframe skeleton with visible interior slabs
          ======================================================== */}
       <group position={[0, 0, -1.0]}>
-        {/* Transparent outer glass facade */}
+        {/* Transparent outer glass facade with cyan Edges */}
         <mesh position={[0, 4.8, 0]}>
           <boxGeometry args={[9.5, 9.6, 6.8]} />
           <meshPhysicalMaterial
-            color="#38bdf8"
-            transmission={0.88}
+            color="#0284c7"
+            transmission={0.92}
             roughness={0.05}
             transparent
-            opacity={0.28}
+            opacity={0.22}
             side={2}
           />
+          <Edges threshold={15} color="#38bdf8" />
         </mesh>
-        {/* Visible interior floor slabs */}
+
+        {/* Visible interior floor slabs (F1..F8) */}
         {floorLevels.map((lvl) => {
           const y = lvl * 1.15 + 0.6;
           return (
             <group key={lvl} position={[0, y, 0]}>
               <mesh>
-                <boxGeometry args={[9.2, 0.12, 6.5]} />
-                <meshStandardMaterial color="#e0f2fe" roughness={0.5} transparent opacity={0.85} />
+                <boxGeometry args={[9.2, 0.06, 6.5]} />
+                <meshBasicMaterial color="#075985" transparent opacity={0.55} />
+                <Edges threshold={15} color="#0ea5e9" />
               </mesh>
-              {/* Internal medical core and elevator banks */}
+              {/* Central elevator / core shaft */}
               <mesh position={[0, 0.5, 0]}>
-                <boxGeometry args={[3.2, 0.9, 2.4]} />
-                <meshStandardMaterial color="#0284c7" transparent opacity={0.65} />
+                <boxGeometry args={[2.8, 0.95, 2.2]} />
+                <meshBasicMaterial color="#0369a1" transparent opacity={0.45} />
+                <Edges threshold={15} color="#38bdf8" />
               </mesh>
-              <Text position={[-4.8, 0.2, 3.3]} fontSize={0.28} color="#0369a1" anchorX="center">
+              <Text position={[-4.7, 0.22, 3.3]} fontSize={0.24} color="#7dd3fc" anchorX="center">
                 F{lvl + 1}
               </Text>
             </group>
           );
         })}
-        {/* Concrete mechanical penthouse and roof signage */}
-        <mesh position={[0, 9.8, 0]}>
-          <boxGeometry args={[7.5, 0.6, 5.0]} />
-          <meshStandardMaterial color="#94a3b8" />
-        </mesh>
-        <Text position={[0, 10.2, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.65} color="#0f172a" anchorX="center">
-          Cardiology center
-        </Text>
+
         {/* Stepped front tier: Critical Care */}
         <mesh position={[0, 2.5, 3.8]}>
           <boxGeometry args={[7.8, 4.8, 2.8]} />
-          <meshStandardMaterial color="#bae6fd" roughness={0.2} transparent opacity={0.8} />
+          <meshPhysicalMaterial
+            color="#0369a1"
+            transmission={0.85}
+            roughness={0.1}
+            transparent
+            opacity={0.28}
+            side={2}
+          />
+          <Edges threshold={15} color="#38bdf8" />
         </mesh>
-        <WindowGrid width={7.0} height={4.0} rows={4} cols={8} position={[0, 2.5, 5.25]} />
-        <Text position={[0, 5.05, 3.8]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.48} color="#0369a1" anchorX="center">
-          Critical care
-        </Text>
+
+        {/* Cardiology center sign attached to upper facade */}
+        <group position={[0, 9.2, 3.42]}>
+          <mesh>
+            <planeGeometry args={[5.2, 0.55]} />
+            <meshBasicMaterial color="#020617" transparent opacity={0.85} />
+            <Edges threshold={15} color="#38bdf8" />
+          </mesh>
+          <Text fontSize={0.26} color="#38bdf8" anchorX="center" anchorY="middle">
+            CARDIOLOGY CENTER
+          </Text>
+        </group>
+        <group position={[0, 4.6, 5.22]}>
+          <mesh>
+            <planeGeometry args={[4.2, 0.45]} />
+            <meshBasicMaterial color="#020617" transparent opacity={0.85} />
+            <Edges threshold={15} color="#38bdf8" />
+          </mesh>
+          <Text fontSize={0.22} color="#7dd3fc" anchorX="center" anchorY="middle">
+            CRITICAL CARE
+          </Text>
+        </group>
       </group>
 
       {/* ========================================================
           2. A&E (ACCIDENT & EMERGENCY) & AMBULANCE BAY
          ======================================================== */}
-      <group position={[-9.5, 0, 2.0]}>
-        <mesh position={[0, 1.4, 0]}>
-          <boxGeometry args={[6.8, 2.8, 5.2]} />
-          <meshStandardMaterial color="#e2e8f0" roughness={0.4} />
+      <BlueprintBuilding
+        args={[6.8, 2.8, 5.2]}
+        position={[-9.5, 1.4, 2.0]}
+        label="A&E / EMERGENCY"
+        floors={2}
+      />
+      {/* Covered Ambulance Bay frame */}
+      <mesh position={[-10.0, 1.2, 5.4]}>
+        <boxGeometry args={[5.2, 0.12, 2.2]} />
+        <meshBasicMaterial color="#075985" transparent opacity={0.6} />
+        <Edges threshold={15} color="#38bdf8" />
+      </mesh>
+      {[-12.2, -7.8].map((x) => (
+        <mesh key={x} position={[x, 0.6, 6.3]}>
+          <cylinderGeometry args={[0.06, 0.06, 1.2, 6]} />
+          <meshBasicMaterial color="#38bdf8" />
         </mesh>
-        {/* Red emergency stripe */}
-        <mesh position={[0, 2.7, 0]}>
-          <boxGeometry args={[6.9, 0.25, 5.3]} />
-          <meshStandardMaterial color="#dc2626" />
-        </mesh>
-        <WindowGrid width={6.0} height={1.8} rows={2} cols={6} position={[0, 1.4, 2.62]} />
-        <Text position={[0, 2.95, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.68} color="#dc2626" anchorX="center">
-          A&E
-        </Text>
-        {/* Covered Emergency Ambulance Bay */}
-        <mesh position={[-0.5, 1.2, 3.6]}>
-          <boxGeometry args={[5.2, 0.2, 2.2]} />
-          <meshStandardMaterial color="#475569" />
-        </mesh>
-        {/* Support pillars */}
-        {[-2.8, 1.8].map((x) => (
-          <mesh key={x} position={[x, 0.6, 4.5]}>
-            <cylinderGeometry args={[0.08, 0.08, 1.2, 8]} />
-            <meshStandardMaterial color="#94a3b8" />
-          </mesh>
-        ))}
-        {/* Parked Ambulances */}
-        <Ambulance position={[-1.6, 0, 3.8]} rotation={[0, 0, 0]} />
-        <Ambulance position={[0.8, 0, 3.8]} rotation={[0, 0, 0]} />
-      </group>
+      ))}
+      <BlueprintAmbulance position={[-11.2, 0, 5.5]} />
+      <BlueprintAmbulance position={[-8.8, 0, 5.5]} />
 
       {/* ========================================================
           3. BREAST CENTER (Connecting wing)
          ======================================================== */}
-      <group position={[-5.8, 0, -2.5]}>
-        <mesh position={[0, 1.8, 0]}>
-          <boxGeometry args={[4.2, 3.4, 3.5]} />
-          <meshStandardMaterial color="#f1f5f9" roughness={0.3} />
-        </mesh>
-        <WindowGrid width={3.8} height={2.5} rows={3} cols={4} position={[0, 1.8, 1.77]} />
-        <Text position={[0, 3.6, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.42} color="#0f172a" anchorX="center">
-          Breast center
-        </Text>
-      </group>
+      <BlueprintBuilding
+        args={[4.2, 3.4, 3.5]}
+        position={[-5.8, 1.7, -2.5]}
+        label="BREAST CENTER"
+        floors={3}
+      />
 
       {/* ========================================================
           4. CLINIC BLOCK (5-floor office/consulting building)
          ======================================================== */}
-      <group position={[-12.5, 0, -2.0]}>
-        <mesh position={[0, 2.8, 0]}>
-          <boxGeometry args={[5.2, 5.6, 4.4]} />
-          <meshStandardMaterial color="#e0f2fe" roughness={0.3} />
-        </mesh>
-        <WindowGrid width={4.6} height={4.8} rows={5} cols={5} position={[0, 2.8, 2.22]} />
-        <Text position={[0, 5.75, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.45} color="#0369a1" anchorX="center">
-          Clinic block
-        </Text>
-      </group>
+      <BlueprintBuilding
+        args={[5.2, 5.6, 4.4]}
+        position={[-12.5, 2.8, -2.0]}
+        label="CLINIC BLOCK"
+        floors={5}
+      />
 
       {/* ========================================================
           5. LABORATORY
          ======================================================== */}
-      <group position={[-15.5, 0, -6.5]}>
-        <mesh position={[0, 1.3, 0]}>
-          <boxGeometry args={[5.8, 2.6, 3.6]} />
-          <meshStandardMaterial color="#cbd5e1" roughness={0.5} />
-        </mesh>
-        <WindowGrid width={5.2} height={1.8} rows={2} cols={5} position={[0, 1.3, 1.82]} />
-        <Text position={[0, 2.7, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.42} color="#1e293b" anchorX="center">
-          Laboratory
-        </Text>
-      </group>
+      <BlueprintBuilding
+        args={[5.8, 2.6, 3.6]}
+        position={[-15.5, 1.3, -6.5]}
+        label="LABORATORY"
+        floors={2}
+      />
 
       {/* ========================================================
           6. MENTAL HEALTH UNIT (North-West)
          ======================================================== */}
-      <group position={[-4.5, 0, -9.0]}>
-        <mesh position={[0, 1.2, 0]}>
-          <boxGeometry args={[6.2, 2.4, 3.8]} />
-          <meshStandardMaterial color="#e2e8f0" roughness={0.4} />
-        </mesh>
-        <WindowGrid width={5.6} height={1.6} rows={2} cols={6} position={[0, 1.2, 1.92]} />
-        <Text position={[0, 2.5, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.45} color="#0f766e" anchorX="center">
-          Mental Health unit
-        </Text>
-      </group>
+      <BlueprintBuilding
+        args={[6.2, 2.4, 3.8]}
+        position={[-4.5, 1.2, -9.0]}
+        label="MENTAL HEALTH"
+        floors={2}
+      />
 
       {/* ========================================================
           7. GENERAL INPATIENT WING (North-East)
          ======================================================== */}
-      <group position={[8.0, 0, -4.5]}>
-        <mesh position={[0, 1.8, 0]}>
-          <boxGeometry args={[7.2, 3.6, 4.4]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.3} />
-        </mesh>
-        <WindowGrid width={6.5} height={2.8} rows={3} cols={7} position={[0, 1.8, 2.22]} />
-        <Text position={[0, 3.7, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.48} color="#0369a1" anchorX="center">
-          General inpatient
-        </Text>
-      </group>
+      <BlueprintBuilding
+        args={[7.2, 3.6, 4.4]}
+        position={[8.0, 1.8, -4.5]}
+        label="GENERAL INPATIENT"
+        floors={3}
+      />
 
       {/* ========================================================
           8. ONCOLOGY BUILDING & DERMATOLOGY CLINIC (East)
          ======================================================== */}
-      <group position={[13.5, 0, 0.5]}>
-        {/* Oncology Building */}
-        <mesh position={[-1.2, 1.6, 0]}>
-          <boxGeometry args={[5.8, 3.2, 4.2]} />
-          <meshStandardMaterial color="#e0f2fe" roughness={0.3} />
-        </mesh>
-        <WindowGrid width={5.2} height={2.4} rows={3} cols={5} position={[-1.2, 1.6, 2.12]} />
-        <Text position={[-1.2, 3.3, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.44} color="#0369a1" anchorX="center">
-          Oncology building
-        </Text>
-
-        {/* Dermatology Clinic adjoining wing */}
-        <mesh position={[3.2, 1.1, 1.8]}>
-          <boxGeometry args={[3.8, 2.2, 3.2]} />
-          <meshStandardMaterial color="#f1f5f9" roughness={0.4} />
-        </mesh>
-        <WindowGrid width={3.2} height={1.5} rows={2} cols={3} position={[3.2, 1.1, 3.42]} />
-        <Text position={[3.2, 2.3, 1.8]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.38} color="#334155" anchorX="center">
-          Dermatology clinic
-        </Text>
-
-        {/* Elevated glass skybridge connecting back to main hospital */}
-        <mesh position={[-5.0, 2.2, -1.0]}>
-          <boxGeometry args={[3.5, 1.1, 1.2]} />
-          <meshPhysicalMaterial color="#93c5fd" transmission={0.8} transparent opacity={0.4} />
-        </mesh>
-      </group>
+      <BlueprintBuilding
+        args={[5.8, 3.2, 4.2]}
+        position={[12.3, 1.6, 0.5]}
+        label="ONCOLOGY"
+        floors={3}
+      />
+      <BlueprintBuilding
+        args={[3.8, 2.2, 3.2]}
+        position={[16.5, 1.1, 2.3]}
+        label="DERMATOLOGY"
+        floors={2}
+      />
+      {/* Skybridge wireframe */}
+      <mesh position={[8.5, 2.2, -0.5]}>
+        <boxGeometry args={[3.2, 1.1, 1.2]} />
+        <meshPhysicalMaterial
+          color="#0284c7"
+          transmission={0.88}
+          transparent
+          opacity={0.3}
+          side={2}
+        />
+        <Edges threshold={15} color="#38bdf8" />
+      </mesh>
 
       {/* ========================================================
           9. NEONATAL CARE & MATERNITY WING (South-East)
          ======================================================== */}
-      <group position={[5.8, 0, 6.5]}>
-        {/* Neonatal Care */}
-        <mesh position={[0, 1.8, -1.5]}>
-          <boxGeometry args={[7.2, 3.6, 4.5]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.3} />
-        </mesh>
-        <WindowGrid width={6.5} height={2.8} rows={3} cols={6} position={[0, 1.8, 0.77]} />
-        <Text position={[0, 3.7, -1.5]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.48} color="#0f766e" anchorX="center">
-          Neonatal care
-        </Text>
-
-        {/* Maternity Unit */}
-        <mesh position={[0, 1.2, 2.6]}>
-          <boxGeometry args={[6.4, 2.4, 3.2]} />
-          <meshStandardMaterial color="#f1f5f9" roughness={0.3} />
-        </mesh>
-        <WindowGrid width={5.8} height={1.6} rows={2} cols={5} position={[0, 1.2, 4.22]} />
-        <Text position={[0, 2.5, 2.6]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.48} color="#0369a1" anchorX="center">
-          Maternity
-        </Text>
-      </group>
+      <BlueprintBuilding
+        args={[7.2, 3.6, 4.5]}
+        position={[5.8, 1.8, 5.0]}
+        label="NEONATAL CARE"
+        floors={3}
+      />
+      <BlueprintBuilding
+        args={[6.4, 2.4, 3.2]}
+        position={[5.8, 1.2, 9.0]}
+        label="MATERNITY"
+        floors={2}
+      />
 
       {/* ========================================================
-          10. PARKING LOTS WITH INDIVIDUAL VEHICLES
+          10. PARKING LOTS WITH BLUEPRINT WIREFRAME CARS
          ======================================================== */}
       {/* West Parking lot */}
       <group position={[-11.5, 0.01, -8.5]}>
         <mesh>
-          <boxGeometry args={[5.5, 0.05, 4.5]} />
-          <meshStandardMaterial color="#334155" />
+          <boxGeometry args={[5.5, 0.03, 4.5]} />
+          <meshBasicMaterial color="#071b30" transparent opacity={0.7} />
+          <Edges threshold={15} color="#0284c7" />
         </mesh>
-        <Text position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.9} color="#60a5fa" anchorX="center">
+        <Text position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.7} color="#38bdf8" anchorX="center">
           P
         </Text>
-        <Car position={[-1.8, 0.04, -1.2]} color="#ef4444" rotation={[0, Math.PI / 2, 0]} />
-        <Car position={[-0.5, 0.04, -1.2]} color="#f8fafc" rotation={[0, Math.PI / 2, 0]} />
-        <Car position={[0.8, 0.04, -1.2]} color="#0284c7" rotation={[0, Math.PI / 2, 0]} />
-        <Car position={[2.0, 0.04, -1.2]} color="#eab308" rotation={[0, Math.PI / 2, 0]} />
+        <BlueprintCar position={[-1.8, 0.03, -1.2]} rotation={[0, Math.PI / 2, 0]} />
+        <BlueprintCar position={[-0.5, 0.03, -1.2]} rotation={[0, Math.PI / 2, 0]} />
+        <BlueprintCar position={[0.8, 0.03, -1.2]} rotation={[0, Math.PI / 2, 0]} />
+        <BlueprintCar position={[2.0, 0.03, -1.2]} rotation={[0, Math.PI / 2, 0]} />
       </group>
 
-      {/* Central Visitor Parking */}
+      {/* Central Staff Parking */}
       <group position={[4.0, 0.01, -0.5]}>
         <mesh>
-          <boxGeometry args={[4.8, 0.05, 3.2]} />
-          <meshStandardMaterial color="#334155" />
+          <boxGeometry args={[4.8, 0.03, 3.2]} />
+          <meshBasicMaterial color="#071b30" transparent opacity={0.7} />
+          <Edges threshold={15} color="#0284c7" />
         </mesh>
-        <Text position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.8} color="#60a5fa" anchorX="center">
+        <Text position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.65} color="#38bdf8" anchorX="center">
           P
         </Text>
-        <Car position={[-1.2, 0.04, 0.8]} color="#f8fafc" />
-        <Car position={[0.4, 0.04, 0.8]} color="#0f172a" />
-        <Ambulance position={[-0.4, 0.04, -0.7]} rotation={[0, Math.PI, 0]} />
+        <BlueprintCar position={[-1.2, 0.03, 0.8]} />
+        <BlueprintCar position={[0.4, 0.03, 0.8]} />
+        <BlueprintAmbulance position={[-0.4, 0.03, -0.7]} rotation={[0, Math.PI, 0]} />
       </group>
 
       {/* South Maternity Parking */}
       <group position={[-0.5, 0.01, 8.5]}>
         <mesh>
-          <boxGeometry args={[5.8, 0.05, 3.2]} />
-          <meshStandardMaterial color="#334155" />
+          <boxGeometry args={[5.8, 0.03, 3.2]} />
+          <meshBasicMaterial color="#071b30" transparent opacity={0.7} />
+          <Edges threshold={15} color="#0284c7" />
         </mesh>
-        <Text position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.8} color="#60a5fa" anchorX="center">
+        <Text position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.65} color="#38bdf8" anchorX="center">
           P
         </Text>
-        <Car position={[-2.0, 0.04, 0.4]} color="#dc2626" />
-        <Car position={[-0.8, 0.04, 0.4]} color="#f8fafc" />
-        <Car position={[0.4, 0.04, 0.4]} color="#38bdf8" />
-        <Car position={[1.6, 0.04, 0.4]} color="#e2e8f0" />
+        <BlueprintCar position={[-2.0, 0.03, 0.4]} />
+        <BlueprintCar position={[-0.8, 0.03, 0.4]} />
+        <BlueprintCar position={[0.4, 0.03, 0.4]} />
+        <BlueprintCar position={[1.6, 0.03, 0.4]} />
       </group>
 
-      {/* East Oncology Parking */}
-      <group position={[11.5, 0.01, 8.0]}>
-        <mesh>
-          <boxGeometry args={[4.8, 0.05, 3.2]} />
-          <meshStandardMaterial color="#334155" />
-        </mesh>
-        <Text position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.8} color="#60a5fa" anchorX="center">
-          P
-        </Text>
-        <Car position={[-1.2, 0.04, 0.4]} color="#0f172a" />
-        <Car position={[0.2, 0.04, 0.4]} color="#f59e0b" />
-        <Car position={[1.5, 0.04, 0.4]} color="#f8fafc" />
-      </group>
-
-      {/* ========================================================
-          11. RED DIRECTIONAL ENTRANCE SIGNS (from template)
-         ======================================================== */}
-      <EntranceMarker text="Emergency entrance" position={[-13.5, 0, 5.5]} rotation={[0, 0.35, 0]} />
-      <EntranceMarker text="Main entrance" position={[-4.5, 0, 7.8]} rotation={[0, -0.2, 0]} />
-      <EntranceMarker text="West entrance" position={[-17.0, 0, -10.5]} rotation={[0, 0.8, 0]} />
-      <EntranceMarker text="North entrance" position={[10.5, 0, -11.5]} rotation={[0, -0.4, 0]} />
-      <EntranceMarker text="East entrance" position={[16.5, 0, 11.5]} rotation={[0, -0.8, 0]} />
-
-      {/* Landscaping Trees along roads & courtyards */}
+      {/* Architectural perimeter trees in blueprint wireframe */}
       {[-18, -15, -12, -9, 0, 3, 7, 12, 16, 19].map((x) => (
         <group key={x}>
-          <CampusTree position={[x, 0, -11.8]} />
-          <CampusTree position={[x, 0, 12.0]} />
+          <BlueprintTree position={[x, 0, -11.8]} />
+          <BlueprintTree position={[x, 0, 12.0]} />
         </group>
       ))}
       {[-8, -5, -2, 2, 5, 8].map((z) => (
         <group key={z}>
-          <CampusTree position={[-19.5, 0, z]} />
-          <CampusTree position={[20.5, 0, z]} />
+          <BlueprintTree position={[-19.5, 0, z]} />
+          <BlueprintTree position={[20.5, 0, z]} />
         </group>
       ))}
     </group>
   );
 }
 
-// 3D Pin / Beacon Marker for an incident
+// 3D Pin / Beacon Marker for an incident (retains triage color for priority)
 function SignalMarker({
   incident,
   position,
@@ -564,14 +495,14 @@ function SignalMarker({
       <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
         {/* Pulsing ground highlight ring */}
         <mesh position={[0, -position[1] + 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.8, isSelected ? 1.6 : 1.2, 32]} />
-          <meshBasicMaterial color={color} transparent opacity={isSelected ? 0.8 : 0.45} side={2} />
+          <ringGeometry args={[0.8, isSelected ? 1.8 : 1.3, 32]} />
+          <meshBasicMaterial color={color} transparent opacity={isSelected ? 0.9 : 0.5} side={2} />
         </mesh>
 
         {/* Vertical beacon beam */}
         <mesh position={[0, 1.2, 0]}>
           <cylinderGeometry args={[0.04, 0.04, 2.4, 8]} />
-          <meshBasicMaterial color={color} transparent opacity={0.6} />
+          <meshBasicMaterial color={color} transparent opacity={0.65} />
         </mesh>
 
         {/* 3D Location Pin Head (Cone pointing down + Sphere) */}
@@ -599,6 +530,7 @@ function SignalMarker({
             <mesh>
               <boxGeometry args={[1.8, 0.5, 0.08]} />
               <meshStandardMaterial color="#020617" />
+              <Edges threshold={15} color={color} />
             </mesh>
             <Text position={[0, 0, 0.05]} fontSize={0.28} color={color} anchorX="center" anchorY="middle">
               {incident.id}
@@ -621,7 +553,6 @@ function SpatialMap({
 }) {
   let offset = 0;
   const markers = incidents.map((incident) => {
-    // Map incident to one of the canonical hospital zones
     const desc = incident.description.toLowerCase();
     let pos: Vec3 = anchorList[offset++ % anchorList.length];
     if (desc.includes("emergency") || desc.includes("a&e") || desc.includes("patient")) {
@@ -643,11 +574,16 @@ function SpatialMap({
 
   return (
     <Canvas shadows camera={{ position: [32, 28, 38], fov: 45 }}>
-      <color attach="background" args={["#030712"]} />
-      <ambientLight intensity={1.5} />
-      <directionalLight position={[20, 35, 25]} intensity={4.2} castShadow />
-      <directionalLight position={[-20, 20, -15]} intensity={1.8} color="#93c5fd" />
-      <pointLight position={[0, 18, 0]} color="#f8fafc" intensity={25} distance={50} />
+      {/* Deep cinematic blueprint background with light blue fog */}
+      <color attach="background" args={["#020817"]} />
+      <fog attach="fog" args={["#020817", 45, 110]} />
+      <ambientLight intensity={1.2} />
+      <directionalLight position={[20, 35, 25]} intensity={3.5} color="#e0f2fe" castShadow />
+      <directionalLight position={[-20, 20, -15]} intensity={2.0} color="#38bdf8" />
+      <pointLight position={[0, 18, 0]} color="#38bdf8" intensity={30} distance={55} />
+
+      {/* Cyber/blueprint cyan floor grid */}
+      <gridHelper args={[60, 60, "#0284c7", "#072b4f"]} position={[0, -0.22, 0]} />
 
       <group>
         <HospitalCampus />
@@ -711,6 +647,21 @@ export default function App() {
     await load();
   }
 
+  async function createDemoIncident() {
+    await fetch(`${API}/api/incidents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        zoneId: "zone-a",
+        category: "security",
+        description: "Aggressive patient in Zone A near Emergency Bay",
+        zoneCode: "123",
+        confirmed: true
+      })
+    });
+    await load();
+  }
+
   async function clearAll() {
     if (!confirm("Очистить все тестовые инциденты?")) return;
     await fetch(`${API}/api/incidents`, { method: "DELETE" });
@@ -733,13 +684,19 @@ export default function App() {
           <p className="eyebrow">SITESIGNAL / LIVE OPERATIONS</p>
           <h1>Voice-powered incident reporting</h1>
           <p className="subtitle">
-            Hospital Site Map: Multi-story Cardiology & Critical Care tower, A&E, Maternity, Oncology, Clinic Block & Emergency bays.
+            Holographic Architectural Blueprint · Cardiology tower, A&E, Maternity, Oncology, Clinic Block & Emergency bays.
           </p>
         </div>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button
+            onClick={createDemoIncident}
+            style={{ fontSize: "12px", background: "#0369a1", color: "#f0f9ff", borderColor: "#38bdf8" }}
+          >
+            + Test Incident
+          </button>
           {incidents.length > 0 && (
             <button onClick={clearAll} style={{ fontSize: "12px", background: "#334155", color: "#cbd5e1" }}>
-              Clear Test Data
+              Clear Data
             </button>
           )}
           <span className="pill">{activeCount} active signals</span>
@@ -753,7 +710,7 @@ export default function App() {
             onSelect={(id) => setSelectedId(id)}
           />
           <div className="map-hint">
-            Interactive Hospital Campus · Click 3D Pin or Queue item to inspect
+            Holographic Campus Blueprint · Click 3D Pin or Queue item to inspect
           </div>
         </div>
         <aside className="panel">
@@ -763,7 +720,15 @@ export default function App() {
           </div>
           {error && <p className="error">{error}</p>}
           {incidents.length === 0 && !error && (
-            <p className="empty">No incidents. Call the SiteSignal number to report one.</p>
+            <div className="empty">
+              <p>No active incidents.</p>
+              <button
+                onClick={createDemoIncident}
+                style={{ marginTop: "12px", fontSize: "12px", background: "#0369a1", color: "#f0f9ff", borderColor: "#38bdf8" }}
+              >
+                Create sample incident
+              </button>
+            </div>
           )}
           {incidents.map((incident) => {
             const isSelected = incident.id === selectedId;
@@ -822,5 +787,3 @@ export default function App() {
     </main>
   );
 }
-
-
