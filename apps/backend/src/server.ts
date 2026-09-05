@@ -186,11 +186,18 @@ app.post("/api/incidents", async (request, reply) => {
 });
 
 app.post("/api/incidents/:id/:action", async (request, reply) => {
-  const params = z.object({ id: z.string(), action: z.enum(["acknowledge", "resolve"]) }).parse(request.params);
+  const params = z.object({ id: z.string(), action: z.enum(["acknowledge", "resolve", "dispatch_security"]) }).parse(request.params);
   const incident = await getIncident(params.id);
   if (!incident) return reply.code(404).send({ error: "incident_not_found" });
   const timestamp = now();
-  incident.status = params.action === "acknowledge" ? "ACKNOWLEDGED" : "RESOLVED";
+  if (params.action === "acknowledge") {
+    incident.status = "ACKNOWLEDGED";
+  } else if (params.action === "resolve") {
+    incident.status = "RESOLVED";
+  } else if (params.action === "dispatch_security") {
+    incident.status = "DISPATCHED_TO_SECURITY";
+    incident.securityDispatchedAt = timestamp;
+  }
   incident.updatedAt = timestamp;
   incident.audit.push({ at: timestamp, action: incident.status, actor: "DISPATCHER" });
   await saveIncident(incident);

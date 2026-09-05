@@ -15,7 +15,12 @@ h1 { font-size: clamp(28px, 4vw, 52px); margin: 0; letter-spacing: -.04em; }
 .panel-heading, .incident-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 h2 { margin: 0; font-size: 18px; } h3 { margin: 10px 0 4px; font-size: 15px; text-transform: capitalize; }
 button { border: 1px solid #334155; border-radius: 8px; background: #172033; color: #e2e8f0; padding: 8px 10px; cursor: pointer; } button:hover { border-color: #38bdf8; }
-.incident { border-top: 1px solid #1e293b; padding: 16px 0; } .incident p { color: #cbd5e1; margin: 6px 0; } .incident small, .empty { color: #64748b; }
-.status { font-size: 11px; font-weight: 800; letter-spacing: .06em; } .actions { display: flex; gap: 8px; margin-top: 12px; }
+.incident { border-top: 1px solid #1e293b; padding: 16px 0; cursor: pointer; transition: background 0.15s; }
+.incident:hover { background: rgba(30, 41, 59, 0.4); border-radius: 8px; }
+.incident.selected { background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8; padding-left: 10px; border-radius: 8px; }
+.incident p { color: #cbd5e1; margin: 6px 0; } .incident small, .empty { color: #64748b; }
+.status { font-size: 11px; font-weight: 800; letter-spacing: .06em; } .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.btn-security { background: #881337; border-color: #f43f5e; color: #ffe4e6; font-weight: 700; }
+.btn-security:hover { background: #9f1239; border-color: #fda4af; }
 .error { color: #fca5a5; background: #451a1a; padding: 10px; border-radius: 8px; } 
 @media (max-width: 900px) { main { padding: 20px; } header { flex-direction: column; } .layout { grid-template-columns: 1fr; } .map-card { min-height: 420px; } }

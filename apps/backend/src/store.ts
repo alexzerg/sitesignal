@@ -5,6 +5,7 @@ export type IncidentStatus =
   | "REPORTED"
   | "CORROBORATED"
   | "ACKNOWLEDGED"
+  | "DISPATCHED_TO_SECURITY"
   | "RESOLVED"
   | "REJECTED"
   | "DUPLICATE"
@@ -22,6 +23,7 @@ export type Incident = {
   reportCount: number;
   zoneCodeValid: boolean;
   callerConfirmed: boolean;
+  securityDispatchedAt?: string;
   createdAt: string;
   updatedAt: string;
   audit: Array<{ at: string; action: string; actor: string }>;
@@ -29,6 +31,7 @@ export type Incident = {
 
 export type PendingCall = {
   callUuid: string;
+  incidentId?: string;
   zoneId: string;
   category: IncidentCategory;
   description: string;
