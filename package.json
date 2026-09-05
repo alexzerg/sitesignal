@@ -1,0 +1,19 @@
+{
+  "name": "sitesignal",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:backend": "npm --workspace apps/backend run dev",
+    "dev:frontend": "npm --workspace apps/frontend run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "npm --workspace apps/backend run build",
+    "build:frontend": "npm --workspace apps/frontend run build",
+    "typecheck": "npm run typecheck:backend && npm run typecheck:frontend",
+    "typecheck:backend": "npm --workspace apps/backend run typecheck",
+    "typecheck:frontend": "npm --workspace apps/frontend run typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
