@@ -22,7 +22,7 @@ const zoneCenters: Record<ZoneId, Vec3> = {
   "zone-c": [8, 0, 0]
 };
 const signalSlots: Record<ZoneId, Vec3[]> = {
-  "zone-a": [[-1.3, 1.5, -0.7], [0.9, 0.8, 0.4], [-0.2, 2.3, 0.7], [1.2, 1.2, -0.8]],
+  "zone-a": [[1.9, 0.7, -1.55], [-1.3, 1.5, -0.7], [0.9, 2.35, 0.4], [-0.2, 1.6, 0.7]],
   "zone-b": [[-1.4, 0.7, -0.4], [0.8, 0.7, 0.6], [1.4, 0.5, -0.8], [-0.5, 1.1, 0.9]],
   "zone-c": [[-1.5, 0.5, -0.6], [0.4, 0.6, 0.8], [1.4, 0.4, -0.7], [0.2, 1.1, -0.1]]
 };
@@ -43,11 +43,24 @@ function Label({ title, subtitle }: { title: string; subtitle: string }) {
 }
 
 function HospitalZone() {
+  const floors = [0, 1, 2, 3];
   return <group position={zoneCenters["zone-a"]}>
-    <Label title="ZONE A · HOSPITAL" subtitle="Emergency care campus" />
+    <Label title="ZONE A · HOSPITAL" subtitle="Four-floor emergency care campus" />
     <mesh position={[0, -0.35, 0]}><boxGeometry args={[6.4, 0.12, 5.2]} /><meshStandardMaterial color="#172554" /></mesh>
-    {[0, 1, 2].map((floor) => <mesh key={floor} position={[-0.25, floor * 0.62 + 0.05, 0]}><boxGeometry args={[3.9, 0.52, 2.6]} /><meshStandardMaterial color={floor === 2 ? "#bfdbfe" : "#60a5fa"} transparent opacity={0.82} /></mesh>)}
-    <mesh position={[2.2, 0.55, 0.2]}><boxGeometry args={[1.4, 1.5, 2.2]} /><meshStandardMaterial color="#93c5fd" /></mesh>
+    <mesh position={[-0.25, 1.05, 0]}><boxGeometry args={[4.35, 3.35, 2.95]} /><meshPhysicalMaterial color="#93c5fd" transmission={0.78} roughness={0.12} transparent opacity={0.24} side={2} /></mesh>
+    {floors.map((floor) => {
+      const y = floor * 0.78 + 0.05;
+      return <group key={floor} position={[-0.25, y, 0]}>
+        <mesh><boxGeometry args={[4.2, 0.1, 2.85]} /><meshStandardMaterial color={floor === 0 ? "#e0f2fe" : "#bfdbfe"} transparent opacity={0.78} /></mesh>
+        <Text position={[-2.5, 0.25, 1.55]} fontSize={0.16} color="#e0f2fe" anchorX="center">F{floor + 1}</Text>
+        <mesh position={[-1.25, 0.34, 0.2]}><boxGeometry args={[1.15, 0.34, 0.8]} /><meshStandardMaterial color={floor % 2 === 0 ? "#38bdf8" : "#818cf8"} transparent opacity={0.75} /></mesh>
+        <mesh position={[0.15, 0.34, 0.2]}><boxGeometry args={[1.15, 0.34, 0.8]} /><meshStandardMaterial color="#60a5fa" transparent opacity={0.75} /></mesh>
+        <mesh position={[1.35, 0.34, 0.2]}><boxGeometry args={[0.7, 0.34, 0.8]} /><meshStandardMaterial color="#c4b5fd" transparent opacity={0.75} /></mesh>
+        <mesh position={[0.15, 0.34, -0.82]}><boxGeometry args={[1.8, 0.34, 0.55]} /><meshStandardMaterial color="#dbeafe" transparent opacity={0.7} /></mesh>
+      </group>;
+    })}
+    <mesh position={[2.2, 1.05, 0.2]}><boxGeometry args={[1.4, 2.2, 2.2]} /><meshPhysicalMaterial color="#bfdbfe" transmission={0.68} roughness={0.1} transparent opacity={0.3} /></mesh>
+    <mesh position={[2.2, 1.05, -0.9]}><boxGeometry args={[0.42, 2.45, 0.42]} /><meshStandardMaterial color="#334155" /></mesh>
     <mesh position={[-2.3, -0.08, -1.45]}><boxGeometry args={[1.8, 0.12, 1.1]} /><meshStandardMaterial color="#ef4444" /></mesh>
     <Text position={[-2.3, 0.05, -1.45]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.18} color="white" anchorX="center">ER</Text>
     <mesh position={[1.9, -0.03, -1.55]} rotation={[-Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.75, 0.75, 0.08, 32]} /><meshStandardMaterial color="#0f172a" /></mesh>
