@@ -158,9 +158,11 @@ async function recordIncident(input: {
 
 app.get("/health", async () => ({ ok: true, service: "sitesignal-backend", storage: storageMode, time: now() }));
 
-app.get("/webhooks/answer", async (_request, reply) => {
+async function answerWebhook(_request: unknown, reply: { type: (value: string) => { send: (body: unknown) => unknown } }) {
   return reply.type("application/json").send(speechNcco("Welcome to SiteSignal. Tell us the zone and problem."));
-});
+}
+app.get("/webhooks/answer", answerWebhook);
+app.post("/webhooks/answer", answerWebhook);
 
 app.post("/webhooks/events", async (request, reply) => {
   const body = (request.body ?? {}) as Record<string, unknown>;
