@@ -98,6 +98,29 @@ export async function getPendingCall(callUuid: string): Promise<PendingCall | un
   return snapshot.exists ? snapshot.data() as PendingCall : undefined;
 }
 
+export async function deleteIncident(id: string): Promise<boolean> {
+  if (!firestore) {
+    return memory.delete(id);
+  }
+  await collection().doc(id).delete();
+  return true;
+}
+
+export async function deleteAllIncidents(): Promise<number> {
+  if (!firestore) {
+    const size = memory.size;
+    memory.clear();
+    return size;
+  }
+  const snapshot = await collection().get();
+  const batch = firestore.batch();
+  for (const doc of snapshot.docs) {
+    batch.delete(doc.ref);
+  }
+  await batch.commit();
+  return snapshot.size;
+}
+
 export async function deletePendingCall(callUuid: string): Promise<void> {
   if (!firestore) {
     pendingMemory.delete(callUuid);

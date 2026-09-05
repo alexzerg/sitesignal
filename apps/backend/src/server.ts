@@ -3,6 +3,8 @@ import cors from "@fastify/cors";
 import { z } from "zod";
 import crypto from "node:crypto";
 import {
+  deleteAllIncidents,
+  deleteIncident,
   deletePendingCall,
   findActiveDuplicate,
   getIncident,
@@ -183,6 +185,17 @@ app.post("/api/incidents", async (request, reply) => {
   });
   if ("error" in result) return reply.code(422).send(result);
   return reply.code(result.duplicate ? 200 : 201).send(result.incident);
+});
+
+app.delete("/api/incidents", async (_request, reply) => {
+  const deleted = await deleteAllIncidents();
+  return reply.code(200).send({ ok: true, deletedCount: deleted });
+});
+
+app.delete("/api/incidents/:id", async (request, reply) => {
+  const params = z.object({ id: z.string() }).parse(request.params);
+  const ok = await deleteIncident(params.id);
+  return reply.code(ok ? 200 : 404).send({ ok, id: params.id });
 });
 
 app.post("/api/incidents/:id/:action", async (request, reply) => {
