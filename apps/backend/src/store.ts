@@ -10,7 +10,7 @@ export type IncidentStatus =
   | "DUPLICATE"
   | "EXPIRED";
 
-export type IncidentCategory = "access" | "equipment" | "safety" | "cleaning";
+export type IncidentCategory = "security" | "access" | "equipment" | "safety" | "cleaning";
 
 export type Incident = {
   id: string;

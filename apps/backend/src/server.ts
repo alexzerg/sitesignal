@@ -20,7 +20,7 @@ const app = Fastify({ logger: true });
 await app.register(cors, { origin: process.env.CORS_ORIGIN ?? "http://localhost:5173" });
 const publicBaseUrl = (process.env.PUBLIC_BASE_URL ?? "http://localhost:8080").replace(/\/$/, "");
 const webhookUrl = (path: string) => `${publicBaseUrl}${path}`;
-const zoneCodes: Record<string, string> = { "zone-a": "1732", "zone-b": "4821", "zone-c": "9054" };
+const zoneCodes: Record<string, string> = { "zone-a": "123" };
 
 const InputSchema = z.object({
   call_uuid: z.string().optional(),
@@ -28,7 +28,7 @@ const InputSchema = z.object({
   dtmf: z.string().optional(),
   zoneId: z.string().optional(),
   zoneCode: z.string().optional(),
-  category: z.enum(["access", "equipment", "safety", "cleaning"]).optional(),
+  category: z.enum(["security", "access", "equipment", "safety", "cleaning"]).optional(),
   description: z.string().optional(),
   confirmed: z.boolean().optional()
 });
@@ -80,6 +80,7 @@ function parseReport(speechText: string): Pick<PendingCall, "zoneId" | "category
   const zoneMatch = normalized.match(/zone\s*([abc])/i);
   const zoneId = zoneMatch ? `zone-${zoneMatch[1].toLowerCase()}` : undefined;
   const category: IncidentCategory | undefined =
+    /security|aggressive|patient|fight|threat|violence|behavior|guard/.test(normalized) ? "security" :
     /access|reader|door|badge|entry/.test(normalized) ? "access" :
     /equipment|machine|screen|device/.test(normalized) ? "equipment" :
     /safety|smoke|fire|hazard|blocked/.test(normalized) ? "safety" :
@@ -141,14 +142,14 @@ app.post("/webhooks/input", async (request, reply) => {
     if (!parsed) return reply.type("application/json").send(speechNcco("Please say a zone, such as Zone B, and describe the problem, such as a broken access reader."));
     const next: PendingCall = { callUuid, ...parsed, stage: "awaiting_zone_code", updatedAt: now() };
     await savePendingCall(next);
-    return reply.type("application/json").send(digitsNcco(`I heard ${parsed.zoneId.replace("zone-", "Zone ")} and ${parsed.description}. Enter the four digit code shown in that zone, then press hash.`, 4, true));
+    return reply.type("application/json").send(digitsNcco(`I heard ${parsed.zoneId.replace("zone-", "Zone ")} and ${parsed.description}. Enter the three digit operational code for this hospital, then press hash.`, 3, true));
   }
 
   if (!pending) return reply.type("application/json").send(speechNcco("Please describe the incident again."));
 
   if (pending.stage === "awaiting_zone_code") {
     if (!digits || digits !== zoneCodes[pending.zoneId]) {
-      return reply.type("application/json").send(digitsNcco("That zone code was not accepted. Enter the four digit code again, then press hash.", 4, true));
+      return reply.type("application/json").send(digitsNcco("That operational code was not accepted. Enter the three digit hospital code again, then press hash.", 3, true));
     }
     pending.zoneCode = digits;
     pending.stage = "awaiting_confirmation";
@@ -173,8 +174,8 @@ app.get("/api/incidents", async () => listIncidents());
 app.post("/api/incidents", async (request, reply) => {
   const input = InputSchema.parse(request.body ?? {});
   const result = await recordIncident({
-    zoneId: input.zoneId ?? "zone-b",
-    category: input.category ?? "access",
+    zoneId: input.zoneId ?? "zone-a",
+    category: input.category ?? "security",
     description: input.description ?? input.speech ?? "Reported physical-space issue",
     zoneCode: input.zoneCode ?? "",
     callerConfirmed: input.confirmed === true,

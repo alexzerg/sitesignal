@@ -2,7 +2,7 @@
 
 **Report physical-space problems by phone. Resolve them on a live 3D map.**
 
-SiteSignal is a DIALED IN Builder Challenge project built around a phone-first operational workflow. A caller reports an incident through Vonage Voice API, confirms the normalized summary and zone code, and the incident appears on a live Three.js/WebXR operations map.
+SiteSignal is a DIALED IN Builder Challenge project built around a phone-first hospital operations workflow. Security, facilities, maintenance and cleaning staff report incidents through Vonage Voice API, confirm the normalized summary and hospital code, and the incident appears on a live Three.js/WebXR operations map.
 
 ## Current vertical slice
 
@@ -40,7 +40,7 @@ Create a local demo incident:
 ```bash
 curl -X POST http://localhost:8080/api/incidents \\
   -H 'content-type: application/json' \\
-  -d '{"zoneId":"zone-b","zoneCode":"4821","category":"access","description":"Broken access reader","confirmed":true}'
+  -d '{"zoneId":"zone-a","zoneCode":"123","category":"security","description":"Aggressive patient near Emergency Bay","confirmed":true}'
 ```
 
 ## Status model
@@ -65,16 +65,14 @@ The caller flow is:
 
 ```text
 1. Call the SiteSignal number.
-2. Say: "Zone B, broken access reader."
-3. Enter the four-digit zone code: 4821.
+2. Say: "Aggressive patient in Zone A near the Emergency Bay."
+3. Enter the three-digit hospital operational code: 123.
 4. Press 1 to confirm.
-5. The incident appears in Firestore and on the 3D map.
+5. The security incident appears in Firestore and on the 3D map.
 ```
 
-Demo zone codes:
+Hospital demo code:
 
 ```text
-Zone A: 1732
-Zone B: 4821
-Zone C: 9054
+Zone A / hospital campus: 123
 ```
