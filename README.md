@@ -8,16 +8,21 @@ SiteSignal is a DIALED IN Builder Challenge project built around a phone-first o
 
 - Fastify backend with health, webhook, incident, confirmation and dispatcher routes.
 - Deterministic zone-code validation and 15-minute duplicate/corroboration grouping.
-- React + Three.js dashboard with live polling placeholder; Firestore realtime is the next adapter.
+- React + Three.js dashboard with live polling placeholder.
+- Firestore-backed incident storage in Cloud Run; local development falls back to memory when `USE_FIRESTORE=false`.
 - No credentials are committed. See `.env.example`.
 
-## Planned GCP deployment
+## GCP deployment
 
-- Firebase Hosting — frontend
-- Cloud Run — Fastify backend
+Project: `sitesignal-alexzerg-2026`
+
+- Frontend — [Cloud Run](https://sitesignal-frontend-bk2663eh3a-uc.a.run.app)
+- Backend — [Cloud Run](https://sitesignal-backend-bk2663eh3a-uc.a.run.app)
 - Firestore Native mode — incidents and audit events
-- Secret Manager — Vonage credentials
-- Artifact Registry — backend image
+- Secret Manager — reserved for Vonage credentials
+- Artifact Registry — backend and frontend images
+
+Firebase Hosting is optional; Cloud Run currently serves the HTTPS frontend without requiring an additional Firebase CLI login.
 
 ## Local development
 
