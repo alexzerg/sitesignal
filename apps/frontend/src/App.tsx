@@ -10,6 +10,9 @@ type Incident = {
   status: string;
   reportCount: number;
   updatedAt: string;
+  source?: "PHONE" | "API";
+  callUuid?: string;
+  locationId?: string;
 };
 
 type Vec3 = [number, number, number];
@@ -22,6 +25,9 @@ const locationAnchors: Record<string, Vec3> = {
   critical_care: [0, 4.0, 1.2],        // Mid-tier Critical Care
   emergency_a_and_e: [-9.5, 2.0, 1.5], // A&E entrance
   emergency_entrance: [-11.0, 1.2, 3.8],// Emergency ambulance bay
+  helipad: [-16.0, 0.9, 8.2],
+  security_gate: [18.0, 1.0, 0.0],
+  pharmacy_cafe: [12.5, 1.0, 5.0],
   main_entrance: [-2.0, 1.2, 5.5],     // Main Hospital Entrance
   breast_center: [-5.8, 2.2, -2.5],    // Breast Center
   clinic_block: [-12.5, 3.2, -2.0],    // Multi-floor Clinic Block
@@ -40,6 +46,7 @@ const locationAnchors: Record<string, Vec3> = {
 const anchorList = Object.values(locationAnchors);
 
 function colorFor(status?: string) {
+  if (status === "AWAITING_CONFIRMATION") return "#22d3ee";
   if (status === "RESOLVED") return "#22c55e";
   if (status === "DISPATCHED_TO_SECURITY") return "#f43f5e";
   if (status === "ACKNOWLEDGED") return "#eab308";
@@ -555,7 +562,9 @@ function SpatialMap({
   const markers = incidents.map((incident) => {
     const desc = incident.description.toLowerCase();
     let pos: Vec3 = anchorList[offset++ % anchorList.length];
-    if (desc.includes("emergency") || desc.includes("a&e") || desc.includes("patient")) {
+    if (incident.locationId && locationAnchors[incident.locationId]) {
+      pos = locationAnchors[incident.locationId];
+    } else if (desc.includes("emergency") || desc.includes("a&e") || desc.includes("patient")) {
       pos = locationAnchors.emergency_entrance;
     } else if (desc.includes("cardio") || desc.includes("heart")) {
       pos = locationAnchors.cardiology;
@@ -675,7 +684,7 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const activeCount = incidents.filter((i) => i.status !== "RESOLVED").length;
+  const activeCount = incidents.filter((i) => !["RESOLVED", "REJECTED", "DUPLICATE", "EXPIRED"].includes(i.status)).length;
 
   return (
     <main>
@@ -755,11 +764,14 @@ export default function App() {
                   </div>
                 </div>
                 <h3>Zone A · {incident.category}</h3>
+                {incident.status === "AWAITING_CONFIRMATION" && (
+                  <div className="call-awaiting">☎ Incoming call · waiting for location code / caller confirmation</div>
+                )}
                 <p>{incident.description}</p>
                 <small>
-                  {incident.reportCount} report(s) · {new Date(incident.updatedAt).toLocaleTimeString()}
+                  {incident.source === "PHONE" ? "☎ PHONE" : "API"} · {incident.reportCount} report(s) · {new Date(incident.updatedAt).toLocaleTimeString()}
                 </small>
-                {incident.status !== "RESOLVED" && (
+                {incident.status !== "RESOLVED" && incident.status !== "REJECTED" && incident.status !== "AWAITING_CONFIRMATION" && (
                   <div className="actions" onClick={(e) => e.stopPropagation()}>
                     {isSecurity && incident.status !== "DISPATCHED_TO_SECURITY" && (
                       <button

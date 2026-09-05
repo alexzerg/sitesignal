@@ -27,11 +27,15 @@ export type Incident = {
   createdAt: string;
   updatedAt: string;
   audit: Array<{ at: string; action: string; actor: string }>;
+  source?: "PHONE" | "API";
+  callUuid?: string;
+  locationId?: string;
 };
 
 export type PendingCall = {
   callUuid: string;
   incidentId?: string;
+  locationId?: string;
   zoneId: string;
   category: IncidentCategory;
   description: string;

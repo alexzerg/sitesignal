@@ -32,11 +32,13 @@ const InputSchema = z.object({
   zoneCode: z.string().optional(),
   category: z.enum(["security", "access", "equipment", "safety", "cleaning"]).optional(),
   description: z.string().optional(),
+  locationId: z.string().optional(),
   confirmed: z.boolean().optional()
 });
 
 function now() { return new Date().toISOString(); }
 function nextId() { return `INC-${crypto.randomBytes(3).toString("hex").toUpperCase()}`; }
+function nextCallIncidentId(callUuid: string) { return `CALL-${callUuid.replace(/[^a-zA-Z0-9]/g, "").slice(-10).toUpperCase()}`; }
 
 function inputNcco(message: string, types: Array<"dtmf" | "speech">, maxDigits?: number, submitOnHash = false) {
   return [
@@ -77,10 +79,17 @@ function extractVoiceInput(body: unknown) {
   return { callUuid, speechText, digits };
 }
 
-function parseReport(speechText: string): Pick<PendingCall, "zoneId" | "category" | "description"> | undefined {
+function parseReport(speechText: string): Pick<PendingCall, "zoneId" | "category" | "description" | "locationId"> | undefined {
   const normalized = speechText.toLowerCase();
   const zoneMatch = normalized.match(/zone\s*([abc])/i);
   const zoneId = zoneMatch ? `zone-${zoneMatch[1].toLowerCase()}` : undefined;
+  const locationId = /emergency|a\s*&\s*e|ambulance/.test(normalized) ? "emergency_entrance" :
+    /helipad|helicopter/.test(normalized) ? "helipad" :
+    /security gate|guard post|guard house/.test(normalized) ? "security_gate" :
+    /parking|car park/.test(normalized) ? "parking_central" :
+    /pharmacy|cafe|café|shop/.test(normalized) ? "pharmacy_cafe" :
+    /laboratory|lab/.test(normalized) ? "laboratory" :
+    /cardiology|critical care/.test(normalized) ? "cardiology" : undefined;
   const category: IncidentCategory | undefined =
     /security|aggressive|patient|fight|threat|violence|behavior|guard/.test(normalized) ? "security" :
     /access|reader|door|badge|entry/.test(normalized) ? "access" :
@@ -88,7 +97,7 @@ function parseReport(speechText: string): Pick<PendingCall, "zoneId" | "category
     /safety|smoke|fire|hazard|blocked/.test(normalized) ? "safety" :
     /clean|spill|trash|waste/.test(normalized) ? "cleaning" : undefined;
   if (!zoneId || !category) return undefined;
-  return { zoneId, category, description: speechText.trim() };
+  return { zoneId, category, locationId, description: speechText.trim() };
 }
 
 async function recordIncident(input: {
@@ -98,6 +107,9 @@ async function recordIncident(input: {
   zoneCode: string;
   callerConfirmed: boolean;
   actor: "PHONE" | "API";
+  incidentId?: string;
+  callUuid?: string;
+  locationId?: string;
 }) {
   const zoneCodeValid = input.zoneCode === zoneCodes[input.zoneId];
   if (!zoneCodeValid || !input.callerConfirmed) return { error: "incident_requires_valid_zone_code_and_confirmation" as const };
@@ -113,10 +125,27 @@ async function recordIncident(input: {
     return { incident: duplicate, duplicate: true as const };
   }
 
+  if (input.incidentId) {
+    const existing = await getIncident(input.incidentId);
+    if (existing) {
+      existing.status = "REPORTED";
+      existing.zoneCodeValid = true;
+      existing.callerConfirmed = true;
+      existing.source = input.actor;
+      existing.callUuid = input.callUuid;
+      existing.locationId = input.locationId;
+      existing.updatedAt = timestamp;
+      existing.audit.push({ at: timestamp, action: "REPORTED_BY_PHONE", actor: input.actor });
+      await saveIncident(existing);
+      return { incident: existing, duplicate: false as const };
+    }
+  }
+
   const incident: Incident = {
-    id: nextId(), siteId: "demo-site", zoneId: input.zoneId, category: input.category,
+    id: input.incidentId ?? nextId(), siteId: "demo-site", zoneId: input.zoneId, category: input.category,
     description: input.description, status: "REPORTED", reportCount: 1,
-    zoneCodeValid, callerConfirmed: input.callerConfirmed,
+    zoneCodeValid, callerConfirmed: input.callerConfirmed, source: input.actor, callUuid: input.callUuid,
+    locationId: input.locationId,
     createdAt: timestamp, updatedAt: timestamp,
     audit: [{ at: timestamp, action: "REPORTED_BY_PHONE", actor: input.actor }]
   };
@@ -142,7 +171,16 @@ app.post("/webhooks/input", async (request, reply) => {
   if (!pending && speechText) {
     const parsed = parseReport(speechText);
     if (!parsed) return reply.type("application/json").send(speechNcco("Please say a zone, such as Zone B, and describe the problem, such as a broken access reader."));
-    const next: PendingCall = { callUuid, ...parsed, stage: "awaiting_zone_code", updatedAt: now() };
+    const pendingIncident: Incident = {
+      id: nextCallIncidentId(callUuid), siteId: "demo-site", zoneId: parsed.zoneId,
+      category: parsed.category, description: parsed.description,
+      status: "AWAITING_CONFIRMATION", reportCount: 1, zoneCodeValid: false,
+      callerConfirmed: false, source: "PHONE", callUuid, locationId: parsed.locationId,
+      createdAt: now(), updatedAt: now(),
+      audit: [{ at: now(), action: "CALL_RECEIVED", actor: "PHONE" }]
+    };
+    const next: PendingCall = { callUuid, incidentId: pendingIncident.id, ...parsed, stage: "awaiting_zone_code", updatedAt: now() };
+    await saveIncident(pendingIncident);
     await savePendingCall(next);
     return reply.type("application/json").send(digitsNcco(`I heard ${parsed.zoneId.replace("zone-", "Zone ")} and ${parsed.description}. Enter the three digit operational code for this hospital, then press hash.`, 3, true));
   }
@@ -156,17 +194,36 @@ app.post("/webhooks/input", async (request, reply) => {
     pending.zoneCode = digits;
     pending.stage = "awaiting_confirmation";
     pending.updatedAt = now();
+    if (pending.incidentId) {
+      const pendingIncident = await getIncident(pending.incidentId);
+      if (pendingIncident) {
+        pendingIncident.zoneCodeValid = true;
+        pendingIncident.updatedAt = pending.updatedAt;
+        pendingIncident.audit.push({ at: pending.updatedAt, action: "LOCATION_CODE_ACCEPTED", actor: "PHONE" });
+        await saveIncident(pendingIncident);
+      }
+    }
     await savePendingCall(pending);
     return reply.type("application/json").send(confirmationNcco(pending));
   }
 
   if (pending.stage === "awaiting_confirmation" && digits === "1" && pending.zoneCode) {
-    const result = await recordIncident({ ...pending, zoneCode: pending.zoneCode, callerConfirmed: true, actor: "PHONE" });
+    const result = await recordIncident({ ...pending, zoneCode: pending.zoneCode, callerConfirmed: true, actor: "PHONE", incidentId: pending.incidentId, callUuid });
     await deletePendingCall(callUuid);
     if ("error" in result) return reply.type("application/json").send(speechNcco("The incident could not be verified. Please call again."));
+    if (result.duplicate && pending.incidentId) await deleteIncident(pending.incidentId);
     return reply.type("application/json").send([{ action: "talk", text: `Your incident ${result.incident.id} has been reported. Thank you.`, language: "en-US", style: 2 }]);
   }
 
+  if (pending.incidentId) {
+    const rejected = await getIncident(pending.incidentId);
+    if (rejected) {
+      rejected.status = "REJECTED";
+      rejected.updatedAt = now();
+      rejected.audit.push({ at: rejected.updatedAt, action: "CALL_CANCELLED", actor: "PHONE" });
+      await saveIncident(rejected);
+    }
+  }
   await deletePendingCall(callUuid);
   return reply.type("application/json").send(speechNcco("The report was cancelled. Please describe the incident again."));
 });
@@ -181,7 +238,8 @@ app.post("/api/incidents", async (request, reply) => {
     description: input.description ?? input.speech ?? "Reported physical-space issue",
     zoneCode: input.zoneCode ?? "",
     callerConfirmed: input.confirmed === true,
-    actor: "API"
+    actor: "API",
+    locationId: input.locationId
   });
   if ("error" in result) return reply.code(422).send(result);
   return reply.code(result.duplicate ? 200 : 201).send(result.incident);
