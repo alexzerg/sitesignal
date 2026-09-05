@@ -27,10 +27,22 @@ export type Incident = {
   audit: Array<{ at: string; action: string; actor: string }>;
 };
 
+export type PendingCall = {
+  callUuid: string;
+  zoneId: string;
+  category: IncidentCategory;
+  description: string;
+  zoneCode?: string;
+  stage: "awaiting_zone_code" | "awaiting_confirmation";
+  updatedAt: string;
+};
+
 const memory = new Map<string, Incident>();
+const pendingMemory = new Map<string, PendingCall>();
 const useFirestore = process.env.USE_FIRESTORE === "true";
 const firestore = useFirestore ? new Firestore({ projectId: process.env.GCP_PROJECT_ID }) : undefined;
 const collection = () => firestore!.collection("incidents");
+const pendingCollection = () => firestore!.collection("callSessions");
 
 export const storageMode = useFirestore ? "firestore" : "memory";
 
@@ -67,4 +79,26 @@ export async function saveIncident(incident: Incident): Promise<void> {
     return;
   }
   await collection().doc(incident.id).set(incident);
+}
+
+export async function savePendingCall(call: PendingCall): Promise<void> {
+  if (!firestore) {
+    pendingMemory.set(call.callUuid, call);
+    return;
+  }
+  await pendingCollection().doc(call.callUuid).set(call);
+}
+
+export async function getPendingCall(callUuid: string): Promise<PendingCall | undefined> {
+  if (!firestore) return pendingMemory.get(callUuid);
+  const snapshot = await pendingCollection().doc(callUuid).get();
+  return snapshot.exists ? snapshot.data() as PendingCall : undefined;
+}
+
+export async function deletePendingCall(callUuid: string): Promise<void> {
+  if (!firestore) {
+    pendingMemory.delete(callUuid);
+    return;
+  }
+  await pendingCollection().doc(callUuid).delete();
 }

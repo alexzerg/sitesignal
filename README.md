@@ -48,3 +48,33 @@ curl -X POST http://localhost:8080/api/incidents \\
 `AWAITING_CONFIRMATION → REPORTED → CORROBORATED → ACKNOWLEDGED → RESOLVED`
 
 Invalid zone codes and unconfirmed calls do not create incidents.
+
+## Vonage voice flow
+
+Configure the Vonage Voice Application with:
+
+```text
+Answer URL:
+https://sitesignal-backend-bk2663eh3a-uc.a.run.app/webhooks/answer
+
+Event URL:
+https://sitesignal-backend-bk2663eh3a-uc.a.run.app/webhooks/events
+```
+
+The caller flow is:
+
+```text
+1. Call the SiteSignal number.
+2. Say: "Zone B, broken access reader."
+3. Enter the four-digit zone code: 4821.
+4. Press 1 to confirm.
+5. The incident appears in Firestore and on the 3D map.
+```
+
+Demo zone codes:
+
+```text
+Zone A: 1732
+Zone B: 4821
+Zone C: 9054
+```

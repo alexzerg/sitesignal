@@ -2,7 +2,19 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { z } from "zod";
 import crypto from "node:crypto";
-import { findActiveDuplicate, getIncident, listIncidents, saveIncident, storageMode, type Incident } from "./store.js";
+import {
+  deletePendingCall,
+  findActiveDuplicate,
+  getIncident,
+  getPendingCall,
+  listIncidents,
+  saveIncident,
+  savePendingCall,
+  storageMode,
+  type Incident,
+  type IncidentCategory,
+  type PendingCall
+} from "./store.js";
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: process.env.CORS_ORIGIN ?? "http://localhost:5173" });
@@ -24,56 +36,152 @@ const InputSchema = z.object({
 function now() { return new Date().toISOString(); }
 function nextId() { return `INC-${crypto.randomBytes(3).toString("hex").toUpperCase()}`; }
 
-function ncco(message: string) {
+function inputNcco(message: string, types: Array<"dtmf" | "speech">, maxDigits?: number, submitOnHash = false) {
   return [
     { action: "talk", text: message, language: "en-US", style: 2 },
-    { action: "input", type: ["dtmf", "speech"], dtmf: { maxDigits: 1, timeOut: 5 }, speech: { endOnSilence: 1, language: "en-US" }, eventUrl: [webhookUrl("/webhooks/input")] }
+    {
+      action: "input",
+      type: types,
+      dtmf: { maxDigits, submitOnHash, timeOut: 10 },
+      speech: { endOnSilence: 1, language: "en-US" },
+      eventUrl: [webhookUrl("/webhooks/input")]
+    }
   ];
+}
+
+function speechNcco(message: string) {
+  return inputNcco(message, ["speech"]);
+}
+
+function digitsNcco(message: string, maxDigits: number, submitOnHash = false) {
+  return inputNcco(message, ["dtmf"], maxDigits, submitOnHash);
+}
+
+function confirmationNcco(pending: PendingCall) {
+  return digitsNcco(
+    `I heard ${pending.zoneId.replace("zone-", "Zone ")} and ${pending.description}. Press 1 to confirm this incident, or 2 to start again.`,
+    1
+  );
+}
+
+function extractVoiceInput(body: unknown) {
+  const raw = body as Record<string, unknown>;
+  const speech = raw.speech as { results?: Array<{ text?: string }> } | string | undefined;
+  const dtmf = raw.dtmf as { digits?: string } | string | undefined;
+  const uuid = raw.uuid;
+  const callUuid = typeof uuid === "string" ? uuid : Array.isArray(uuid) && typeof uuid[0] === "string" ? uuid[0] : typeof raw.call_uuid === "string" ? raw.call_uuid : undefined;
+  const speechText = typeof speech === "string" ? speech : speech?.results?.[0]?.text;
+  const digits = typeof dtmf === "string" ? dtmf : dtmf?.digits;
+  return { callUuid, speechText, digits };
+}
+
+function parseReport(speechText: string): Pick<PendingCall, "zoneId" | "category" | "description"> | undefined {
+  const normalized = speechText.toLowerCase();
+  const zoneMatch = normalized.match(/zone\s*([abc])/i);
+  const zoneId = zoneMatch ? `zone-${zoneMatch[1].toLowerCase()}` : undefined;
+  const category: IncidentCategory | undefined =
+    /access|reader|door|badge|entry/.test(normalized) ? "access" :
+    /equipment|machine|screen|device/.test(normalized) ? "equipment" :
+    /safety|smoke|fire|hazard|blocked/.test(normalized) ? "safety" :
+    /clean|spill|trash|waste/.test(normalized) ? "cleaning" : undefined;
+  if (!zoneId || !category) return undefined;
+  return { zoneId, category, description: speechText.trim() };
+}
+
+async function recordIncident(input: {
+  zoneId: string;
+  category: IncidentCategory;
+  description: string;
+  zoneCode: string;
+  callerConfirmed: boolean;
+  actor: "PHONE" | "API";
+}) {
+  const zoneCodeValid = input.zoneCode === zoneCodes[input.zoneId];
+  if (!zoneCodeValid || !input.callerConfirmed) return { error: "incident_requires_valid_zone_code_and_confirmation" as const };
+
+  const timestamp = now();
+  const duplicate = await findActiveDuplicate(input.zoneId, input.category, timestamp);
+  if (duplicate) {
+    duplicate.reportCount += 1;
+    duplicate.status = "CORROBORATED";
+    duplicate.updatedAt = timestamp;
+    duplicate.audit.push({ at: timestamp, action: "CORROBORATED_BY_RELATED_REPORT", actor: input.actor });
+    await saveIncident(duplicate);
+    return { incident: duplicate, duplicate: true as const };
+  }
+
+  const incident: Incident = {
+    id: nextId(), siteId: "demo-site", zoneId: input.zoneId, category: input.category,
+    description: input.description, status: "REPORTED", reportCount: 1,
+    zoneCodeValid, callerConfirmed: input.callerConfirmed,
+    createdAt: timestamp, updatedAt: timestamp,
+    audit: [{ at: timestamp, action: "REPORTED_BY_PHONE", actor: input.actor }]
+  };
+  await saveIncident(incident);
+  return { incident, duplicate: false as const };
 }
 
 app.get("/health", async () => ({ ok: true, service: "sitesignal-backend", storage: storageMode, time: now() }));
 
 app.get("/webhooks/answer", async (_request, reply) => {
-  return reply.type("application/json").send(ncco("Welcome to SiteSignal. Tell us the zone and problem, then confirm the summary."));
+  return reply.type("application/json").send(speechNcco("Welcome to SiteSignal. Tell us the zone and problem."));
+});
+
+app.post("/webhooks/events", async (_request, reply) => {
+  return reply.code(204).send();
 });
 
 app.post("/webhooks/input", async (request, reply) => {
-  const input = InputSchema.parse(request.body ?? {});
-  return reply.type("application/json").send(ncco(`I heard ${input.speech ?? "your input"}. Press 1 to confirm or 2 to try again.`));
+  const { callUuid, speechText, digits } = extractVoiceInput(request.body);
+  if (!callUuid) return reply.type("application/json").send(speechNcco("I could not identify this call. Please call again."));
+
+  const pending = await getPendingCall(callUuid);
+  if (!pending && speechText) {
+    const parsed = parseReport(speechText);
+    if (!parsed) return reply.type("application/json").send(speechNcco("Please say a zone, such as Zone B, and describe the problem, such as a broken access reader."));
+    const next: PendingCall = { callUuid, ...parsed, stage: "awaiting_zone_code", updatedAt: now() };
+    await savePendingCall(next);
+    return reply.type("application/json").send(digitsNcco(`I heard ${parsed.zoneId.replace("zone-", "Zone ")} and ${parsed.description}. Enter the four digit code shown in that zone, then press hash.`, 4, true));
+  }
+
+  if (!pending) return reply.type("application/json").send(speechNcco("Please describe the incident again."));
+
+  if (pending.stage === "awaiting_zone_code") {
+    if (!digits || digits !== zoneCodes[pending.zoneId]) {
+      return reply.type("application/json").send(digitsNcco("That zone code was not accepted. Enter the four digit code again, then press hash.", 4, true));
+    }
+    pending.zoneCode = digits;
+    pending.stage = "awaiting_confirmation";
+    pending.updatedAt = now();
+    await savePendingCall(pending);
+    return reply.type("application/json").send(confirmationNcco(pending));
+  }
+
+  if (pending.stage === "awaiting_confirmation" && digits === "1" && pending.zoneCode) {
+    const result = await recordIncident({ ...pending, zoneCode: pending.zoneCode, callerConfirmed: true, actor: "PHONE" });
+    await deletePendingCall(callUuid);
+    if ("error" in result) return reply.type("application/json").send(speechNcco("The incident could not be verified. Please call again."));
+    return reply.type("application/json").send([{ action: "talk", text: `Your incident ${result.incident.id} has been reported. Thank you.`, language: "en-US", style: 2 }]);
+  }
+
+  await deletePendingCall(callUuid);
+  return reply.type("application/json").send(speechNcco("The report was cancelled. Please describe the incident again."));
 });
 
 app.get("/api/incidents", async () => listIncidents());
 
 app.post("/api/incidents", async (request, reply) => {
   const input = InputSchema.parse(request.body ?? {});
-  const zoneId = input.zoneId ?? "zone-b";
-  const category = input.category ?? "access";
-  const description = input.description ?? input.speech ?? "Reported physical-space issue";
-  const zoneCodeValid = input.zoneCode === zoneCodes[zoneId];
-  const timestamp = now();
-  const duplicate = await findActiveDuplicate(zoneId, category, timestamp);
-
-  if (!zoneCodeValid || input.confirmed !== true) {
-    return reply.code(422).send({ error: "incident_requires_valid_zone_code_and_confirmation" });
-  }
-
-  if (duplicate) {
-    duplicate.reportCount += 1;
-    duplicate.status = "CORROBORATED";
-    duplicate.updatedAt = timestamp;
-    duplicate.audit.push({ at: timestamp, action: "CORROBORATED_BY_RELATED_REPORT", actor: "PHONE" });
-    await saveIncident(duplicate);
-    return reply.code(200).send(duplicate);
-  }
-
-  const incident: Incident = {
-    id: nextId(), siteId: "demo-site", zoneId, category, description,
-    status: "REPORTED", reportCount: 1, zoneCodeValid, callerConfirmed: true,
-    createdAt: timestamp, updatedAt: timestamp,
-    audit: [{ at: timestamp, action: "REPORTED_BY_PHONE", actor: "PHONE" }]
-  };
-  await saveIncident(incident);
-  return reply.code(201).send(incident);
+  const result = await recordIncident({
+    zoneId: input.zoneId ?? "zone-b",
+    category: input.category ?? "access",
+    description: input.description ?? input.speech ?? "Reported physical-space issue",
+    zoneCode: input.zoneCode ?? "",
+    callerConfirmed: input.confirmed === true,
+    actor: "API"
+  });
+  if ("error" in result) return reply.code(422).send(result);
+  return reply.code(result.duplicate ? 200 : 201).send(result.incident);
 });
 
 app.post("/api/incidents/:id/:action", async (request, reply) => {
