@@ -23,7 +23,9 @@ const app = Fastify({ logger: true });
 await app.register(cors, { origin: process.env.CORS_ORIGIN ?? "http://localhost:5173" });
 const publicBaseUrl = (process.env.PUBLIC_BASE_URL ?? "http://localhost:8080").replace(/\/$/, "");
 const webhookUrl = (path: string) => `${publicBaseUrl}${path}`;
-const zoneCodes: Record<string, string> = { "zone-a": "123" };
+const zoneCodes: Record<string, string[]> = { "zone-a": ["123", "3414"] };
+const locationCodeMap: Record<string, string> = { "3414": "emergency_entrance" };
+function isValidZoneCode(zoneId: string, code: string) { return zoneCodes[zoneId]?.includes(code) === true; }
 
 const InputSchema = z.object({
   call_uuid: z.string().optional(),
@@ -112,7 +114,7 @@ async function recordIncident(input: {
   callUuid?: string;
   locationId?: string;
 }) {
-  const zoneCodeValid = input.zoneCode === zoneCodes[input.zoneId];
+  const zoneCodeValid = isValidZoneCode(input.zoneId, input.zoneCode);
   if (!zoneCodeValid || !input.callerConfirmed) return { error: "incident_requires_valid_zone_code_and_confirmation" as const };
 
   const timestamp = now();
@@ -208,16 +210,17 @@ app.post("/webhooks/input", async (request, reply) => {
     await saveIncident(pendingIncident);
     const next: PendingCall = { callUuid, incidentId: pendingIncident.id, ...parsed, stage: "awaiting_zone_code", updatedAt: timestamp };
     await savePendingCall(next);
-    return reply.type("application/json").send(digitsNcco(`I heard ${parsed.zoneId.replace("zone-", "Zone ")} and ${parsed.description}. Enter the three digit operational code for this hospital, then press hash.`, 3, true));
+    return reply.type("application/json").send(digitsNcco(`I heard ${parsed.zoneId.replace("zone-", "Zone ")} and ${parsed.description}. Enter the location code printed on the wall, for example 3414, then press hash.`, 4, true));
   }
 
   if (!pending) return reply.type("application/json").send(speechNcco("Please describe the incident again."));
 
   if (pending.stage === "awaiting_zone_code") {
-    if (!digits || digits !== zoneCodes[pending.zoneId]) {
-      return reply.type("application/json").send(digitsNcco("That operational code was not accepted. Enter the three digit hospital code again, then press hash.", 3, true));
+    if (!digits || !isValidZoneCode(pending.zoneId, digits)) {
+      return reply.type("application/json").send(digitsNcco("That location code was not accepted. Enter the four digit code printed on the wall again, then press hash.", 4, true));
     }
     pending.zoneCode = digits;
+    if (locationCodeMap[digits]) pending.locationId = locationCodeMap[digits];
     pending.stage = "awaiting_confirmation";
     pending.updatedAt = now();
     if (pending.incidentId) {
