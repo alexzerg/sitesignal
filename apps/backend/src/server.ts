@@ -7,6 +7,7 @@ import {
   deleteIncident,
   deletePendingCall,
   findActiveDuplicate,
+  findIncidentByCallUuid,
   getIncident,
   getPendingCall,
   listIncidents,
@@ -159,7 +160,24 @@ app.get("/webhooks/answer", async (_request, reply) => {
   return reply.type("application/json").send(speechNcco("Welcome to SiteSignal. Tell us the zone and problem."));
 });
 
-app.post("/webhooks/events", async (_request, reply) => {
+app.post("/webhooks/events", async (request, reply) => {
+  const body = (request.body ?? {}) as Record<string, unknown>;
+  const callUuid = typeof body.uuid === "string" ? body.uuid : typeof body.call_uuid === "string" ? body.call_uuid : undefined;
+  const status = typeof body.status === "string" ? body.status.toLowerCase() : "";
+  if (callUuid && ["started", "ringing", "answered"].includes(status)) {
+    const existing = await findIncidentByCallUuid(callUuid);
+    if (!existing) {
+      const timestamp = now();
+      await saveIncident({
+        id: nextCallIncidentId(callUuid), siteId: "demo-site", zoneId: "zone-a",
+        category: "security", description: "Incoming call — waiting for caller description",
+        status: "AWAITING_CONFIRMATION", reportCount: 1, zoneCodeValid: false,
+        callerConfirmed: false, source: "PHONE", callUuid,
+        createdAt: timestamp, updatedAt: timestamp,
+        audit: [{ at: timestamp, action: "CALL_RECEIVED", actor: "PHONE" }]
+      });
+    }
+  }
   return reply.code(204).send();
 });
 
@@ -171,16 +189,24 @@ app.post("/webhooks/input", async (request, reply) => {
   if (!pending && speechText) {
     const parsed = parseReport(speechText);
     if (!parsed) return reply.type("application/json").send(speechNcco("Please say a zone, such as Zone B, and describe the problem, such as a broken access reader."));
-    const pendingIncident: Incident = {
+    const existingCall = await findIncidentByCallUuid(callUuid);
+    const timestamp = now();
+    const pendingIncident: Incident = existingCall ?? {
       id: nextCallIncidentId(callUuid), siteId: "demo-site", zoneId: parsed.zoneId,
       category: parsed.category, description: parsed.description,
       status: "AWAITING_CONFIRMATION", reportCount: 1, zoneCodeValid: false,
-      callerConfirmed: false, source: "PHONE", callUuid, locationId: parsed.locationId,
-      createdAt: now(), updatedAt: now(),
-      audit: [{ at: now(), action: "CALL_RECEIVED", actor: "PHONE" }]
+      callerConfirmed: false, source: "PHONE", callUuid,
+      createdAt: timestamp, updatedAt: timestamp,
+      audit: [{ at: timestamp, action: "CALL_RECEIVED", actor: "PHONE" }]
     };
-    const next: PendingCall = { callUuid, incidentId: pendingIncident.id, ...parsed, stage: "awaiting_zone_code", updatedAt: now() };
+    pendingIncident.zoneId = parsed.zoneId;
+    pendingIncident.category = parsed.category;
+    pendingIncident.description = parsed.description;
+    pendingIncident.locationId = parsed.locationId;
+    pendingIncident.status = "AWAITING_CONFIRMATION";
+    pendingIncident.updatedAt = timestamp;
     await saveIncident(pendingIncident);
+    const next: PendingCall = { callUuid, incidentId: pendingIncident.id, ...parsed, stage: "awaiting_zone_code", updatedAt: timestamp };
     await savePendingCall(next);
     return reply.type("application/json").send(digitsNcco(`I heard ${parsed.zoneId.replace("zone-", "Zone ")} and ${parsed.description}. Enter the three digit operational code for this hospital, then press hash.`, 3, true));
   }

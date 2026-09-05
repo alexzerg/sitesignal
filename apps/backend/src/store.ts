@@ -65,6 +65,13 @@ export async function getIncident(id: string): Promise<Incident | undefined> {
   return snapshot.exists ? snapshot.data() as Incident : undefined;
 }
 
+
+export async function findIncidentByCallUuid(callUuid: string): Promise<Incident | undefined> {
+  if (!firestore) return Array.from(memory.values()).find((incident) => incident.callUuid === callUuid);
+  const snapshot = await collection().where("callUuid", "==", callUuid).limit(1).get();
+  return snapshot.empty ? undefined : snapshot.docs[0].data() as Incident;
+}
+
 export async function findActiveDuplicate(zoneId: string, category: IncidentCategory, timestamp: string): Promise<Incident | undefined> {
   const cutoff = Date.parse(timestamp) - 15 * 60 * 1000;
   const activeStatuses: IncidentStatus[] = ["REPORTED", "CORROBORATED", "ACKNOWLEDGED"];
