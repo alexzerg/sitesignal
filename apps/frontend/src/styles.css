@@ -9,8 +9,9 @@ h1 { font-size: clamp(28px, 4vw, 52px); margin: 0; letter-spacing: -.04em; }
 .pill { background: #0f172a; border: 1px solid #1e293b; border-radius: 999px; color: #7dd3fc; padding: 9px 14px; white-space: nowrap; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 20px; }
 .map-card, .panel { background: #0b1220; border: 1px solid #1e293b; border-radius: 18px; overflow: hidden; }
-.map-card { min-height: 620px; }
-.panel { padding: 18px; max-height: 620px; overflow-y: auto; }
+.map-card { min-height: 820px; position: relative; }
+.panel { padding: 18px; max-height: 820px; overflow-y: auto; }
+.map-hint { position: absolute; left: 18px; bottom: 16px; z-index: 2; padding: 8px 12px; border: 1px solid #334155; border-radius: 999px; background: rgba(2, 6, 23, .82); color: #cbd5e1; font-size: 12px; pointer-events: none; }
 .panel-heading, .incident-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 h2 { margin: 0; font-size: 18px; } h3 { margin: 10px 0 4px; font-size: 15px; text-transform: capitalize; }
 button { border: 1px solid #334155; border-radius: 8px; background: #172033; color: #e2e8f0; padding: 8px 10px; cursor: pointer; } button:hover { border-color: #38bdf8; }

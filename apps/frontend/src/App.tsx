@@ -116,17 +116,18 @@ function SpatialMap({ incidents }: { incidents: Incident[] }) {
     return { incident, position: [center[0] + slot[0], center[1] + slot[1], center[2] + slot[2]] as Vec3 };
   });
 
-  return <Canvas camera={{ position: [0, 11, 22], fov: 48 }}>
+  return <Canvas shadows camera={{ position: [13, 10, 17], fov: 52 }}>
     <color attach="background" args={["#07111f"]} />
-    <ambientLight intensity={1.8} />
-    <directionalLight position={[0, 12, 8]} intensity={3.5} />
-    <pointLight position={[-8, 4, 2]} color="#60a5fa" intensity={18} distance={12} />
-    <pointLight position={[8, 4, 2]} color="#facc15" intensity={12} distance={12} />
-    <group rotation={[-0.22, 0, 0]}>
+    <ambientLight intensity={1.25} />
+    <directionalLight position={[4, 14, 8]} intensity={4.5} castShadow />
+    <pointLight position={[-8, 5, 2]} color="#60a5fa" intensity={24} distance={16} />
+    <pointLight position={[8, 5, 2]} color="#facc15" intensity={18} distance={16} />
+    <gridHelper args={[26, 26, "#334155", "#172554"]} position={[0, -0.25, 0]} />
+    <group>
       <HospitalZone />
       {markers.map(({ incident, position }) => <SignalMarker key={incident.id} incident={incident} position={position} />)}
     </group>
-    <OrbitControls enablePan={false} minDistance={13} maxDistance={30} />
+    <OrbitControls enablePan enableRotate enableZoom enableDamping rotateSpeed={0.85} zoomSpeed={0.85} dampingFactor={0.08} minPolarAngle={0.35} maxPolarAngle={1.48} minDistance={10} maxDistance={42} target={[0, 1.2, 0]} />
   </Canvas>;
 }
 
@@ -155,7 +156,7 @@ export default function App() {
   return <main>
     <header><div><p className="eyebrow">SITESIGNAL / LIVE OPERATIONS</p><h1>Voice-powered incident reporting</h1><p className="subtitle">One large hospital campus: security, facilities, parking, retail, emergency and helipad operations.</p></div><span className="pill">{incidents.length} active signals</span></header>
     <section className="layout">
-      <div className="map-card"><SpatialMap incidents={incidents} /></div>
+      <div className="map-card"><SpatialMap incidents={incidents} /><div className="map-hint">Drag to rotate · Scroll to zoom · Right-drag to pan</div></div>
       <aside className="panel"><div className="panel-heading"><h2>Incident queue</h2><button onClick={load}>Refresh</button></div>{error && <p className="error">{error}</p>}{incidents.length === 0 && !error && <p className="empty">No incidents. Call the SiteSignal number to report one.</p>}{incidents.map(incident => <article className="incident" key={incident.id}><div className="incident-top"><strong>{incident.id}</strong><span className="status" style={{ color: colorFor(incident.status) }}>{incident.status}</span></div><h3>{incident.zoneId} · {incident.category}</h3><p>{incident.description}</p><small>{incident.reportCount} report(s) · {new Date(incident.updatedAt).toLocaleTimeString()}</small>{incident.status !== "RESOLVED" && <div className="actions">{incident.status === "REPORTED" || incident.status === "CORROBORATED" ? <button onClick={() => updateIncident(incident.id, "acknowledge")}>Acknowledge</button> : null}<button onClick={() => updateIncident(incident.id, "resolve")}>Resolve</button></div>}</article>)}</aside>
     </section>
   </main>;
